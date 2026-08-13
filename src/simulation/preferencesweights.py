@@ -12,7 +12,7 @@ class Preferences:
         self.infrastructure = infrastructure
 
     def __repr__(self):
-        return f"Preference(economy={self.economy}, tax={self.tax}, healthcare={self.healthcare}, education={self.education}, immigration={self.immigration}, environment={self.environment}, crime={self.crime}, government_size={self.government_size}, foreign_policy={self.foreign_policy}, infrastructure={self.infrastructure})"
+        return f"Preference(economy={self.economy},\ntax={self.tax},\nhealthcare={self.healthcare},\neducation={self.education},\nimmigration={self.immigration},\nenvironment={self.environment},\ncrime={self.crime},\ngovernment_size={self.government_size},\nforeign_policy={self.foreign_policy},\ninfrastructure={self.infrastructure})"
 
 class Weights:
     def __init__(self, economy, tax, healthcare, education, immigration, environment, crime, government_size, foreign_policy, infrastructure):
@@ -28,4 +28,4 @@ class Weights:
         self.infrastructure = infrastructure
 
     def __repr__(self):
-        return f"Weights(economy={self.economy}, tax={self.tax}, healthcare={self.healthcare}, education={self.education}, immigration={self.immigration}, environment={self.environment}, crime={self.crime}, government_size={self.government_size}, foreign_policy={self.foreign_policy}, infrastructure={self.infrastructure})"
+        return f"Weights(economy={self.economy},\ntax={self.tax},\nhealthcare={self.healthcare},\neducation={self.education},\nimmigration={self.immigration},\nenvironment={self.environment},\ncrime={self.crime},\ngovernment_size={self.government_size},\nforeign_policy={self.foreign_policy},\ninfrastructure={self.infrastructure})"
