@@ -1,5 +1,7 @@
 import numpy as np
 from settings import EDUCATION_LEVELS, EDUCATION_WEIGHTS, REGION_VOTERS, DEFAULT_REGIONAL_LEAN
+from simulation.preferencesweights import Preferences, Weights
+
 
 class Voter:
     def __init__(self, id, name, age, region):
@@ -17,30 +19,34 @@ class Voter:
         region_weights = region_data.get("weights", {})
         region_variation = region_data.get("variation", 0.1)
 
-        self.economy_preference = region_preferences.get("economy", 0.5) + np.random.normal(0, region_variation)
-        self.tax_preference = region_preferences.get("taxes", 0.5) + np.random.normal(0, region_variation)
-        self.healthcare_preference = region_preferences.get("healthcare", 0.5) + np.random.normal(0, region_variation)
-        self.education_preference = region_preferences.get("education", 0.5) + np.random.normal(0, region_variation)
-        self.immigration_preference = region_preferences.get("immigration", 0.5) + np.random.normal(0, region_variation)
-        self.environment_preference = region_preferences.get("environment", 0.5) + np.random.normal(0, region_variation)
-        self.crime_preference = region_preferences.get("crime", 0.5) + np.random.normal(0, region_variation)
-        self.government_size_preference = region_preferences.get("government_size", 0.5) + np.random.normal(0, region_variation)
-        self.foreign_policy_preference = region_preferences.get("foreign_policy", 0.5) + np.random.normal(0, region_variation)
-        self.infrastructure_preference = region_preferences.get("infrastructure", 0.5) + np.random.normal(0, region_variation)
+        self.preferences = Preferences(
+            economy=region_preferences.get("economy", 0.5) + np.random.normal(0, region_variation),
+            tax=region_preferences.get("taxes", 0.5) + np.random.normal(0, region_variation),
+            healthcare=region_preferences.get("healthcare", 0.5) + np.random.normal(0, region_variation),
+            education=region_preferences.get("education", 0.5) + np.random.normal(0, region_variation),
+            immigration=region_preferences.get("immigration", 0.5) + np.random.normal(0, region_variation),
+            environment=region_preferences.get("environment", 0.5) + np.random.normal(0, region_variation),
+            crime=region_preferences.get("crime", 0.5) + np.random.normal(0, region_variation),
+            government_size=region_preferences.get("government_size", 0.5) + np.random.normal(0, region_variation),
+            foreign_policy=region_preferences.get("foreign_policy", 0.5) + np.random.normal(0, region_variation),
+            infrastructure=region_preferences.get("infrastructure", 0.5) + np.random.normal(0, region_variation)
+        )
 
-        self.economy_weight = region_weights.get("economy", 0.5) + np.random.normal(0, region_variation)
-        self.tax_weight = region_weights.get("taxes", 0.5) + np.random.normal(0, region_variation)
-        self.healthcare_weight = region_weights.get("healthcare", 0.5) + np.random.normal(0, region_variation)
-        self.education_weight = region_weights.get("education", 0.5) + np.random.normal(0, region_variation)
-        self.immigration_weight = region_weights.get("immigration", 0.5) + np.random.normal(0, region_variation)
-        self.environment_weight = region_weights.get("environment", 0.5) + np.random.normal(0, region_variation)
-        self.crime_weight = region_weights.get("crime", 0.5) + np.random.normal(0, region_variation)
-        self.government_size_weight = region_weights.get("government_size", 0.5) + np.random.normal(0, region_variation)
-        self.foreign_policy_weight = region_weights.get("foreign_policy", 0.5) + np.random.normal(0, region_variation)
-        self.infrastructure_weight = region_weights.get("infrastructure", 0.5) + np.random.normal(0, region_variation)
+        self.weights = Weights(
+            economy=region_weights.get("economy", 0.5) + np.random.normal(0, region_variation),
+            tax=region_weights.get("taxes", 0.5) + np.random.normal(0, region_variation),
+            healthcare=region_weights.get("healthcare", 0.5) + np.random.normal(0, region_variation),
+            education=region_weights.get("education", 0.5) + np.random.normal(0, region_variation),
+            immigration=region_weights.get("immigration", 0.5) + np.random.normal(0, region_variation),
+            environment=region_weights.get("environment", 0.5) + np.random.normal(0, region_variation),
+            crime=region_weights.get("crime", 0.5) + np.random.normal(0, region_variation),
+            government_size=region_weights.get("government_size", 0.5) + np.random.normal(0, region_variation),
+            foreign_policy=region_weights.get("foreign_policy", 0.5) + np.random.normal(0, region_variation),
+            infrastructure=region_weights.get("infrastructure", 0.5) + np.random.normal(0, region_variation)
+        )
 
     def __repr__(self):
-        return f"Voter(id={self.id}, name='{self.name}', age={self.age}, economy_preference={self.economy_preference}, tax_preference={self.tax_preference}, healthcare_preference={self.healthcare_preference}, education_preference={self.education_preference}, immigration_preference={self.immigration_preference}, environment_preference={self.environment_preference}, crime_preference={self.crime_preference}, government_size_preference={self.government_size_preference}, foreign_policy_preference={self.foreign_policy_preference}, infrastructure_preference={self.infrastructure_preference}, economy_weight={self.economy_weight}, tax_weight={self.tax_weight}, healthcare_weight={self.healthcare_weight}, education_weight={self.education_weight}, immigration_weight={self.immigration_weight}, environment_weight={self.environment_weight}, crime_weight={self.crime_weight}, government_size_weight={self.government_size_weight}, foreign_policy_weight={self.foreign_policy_weight}, infrastructure_weight={self.infrastructure_weight})"
+        return f"Voter(id={self.id}, name='{self.name}', age={self.age}, income={self.income}, education='{self.education}', region='{self.region}', turnout_probability={self.turnout_probability}, preferences={self.preferences}, weights={self.weights})"
 
 class VoterList:
     def __init__(self, voter):
