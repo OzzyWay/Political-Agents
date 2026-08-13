@@ -1,9 +1,11 @@
 from simulation.voters import Voter, VoterList, GenerateVoterList
 from simulation.preferencesweights import Preferences, Weights
-from settings import REGION_VOTERS
+from simulation.parties import Party, Candidate, getPartyAffinity
+from settings import REGION_VOTERS, DEFAULT_REGIONS, DEFAULT_PARTY_PREFERENCES, DEFAULT_CANDIDATES
 
 
 class Region:
+
     def getAvgs(self):
         current = self.voter_list
         count = 0
@@ -16,6 +18,7 @@ class Region:
 
             self.age += voter.age
             self.turnout_probability += voter.turnout_probability
+            self.income += voter.income
 
             self.preferences.economy += voter.preferences.economy
             self.preferences.tax += voter.preferences.tax
@@ -44,6 +47,8 @@ class Region:
 
         self.age /= count
         self.turnout_probability /= count
+        self.income /= count
+
         self.preferences.economy /= count
         self.preferences.tax /= count
         self.preferences.healthcare /= count
@@ -66,20 +71,25 @@ class Region:
         self.weights.foreign_policy /= count
         self.weights.infrastructure /= count
 
-    def __init__(self, name, num_voters):
+
+    def __init__(self, name, num_voters, parties):
         self.name = name
         self.age = 0
+        self.income = 0;
         self.turnout_probability = 0
-        self.voter_list = GenerateVoterList(region=name, num_voters=num_voters)
+        self.voter_list = GenerateVoterList(region=name, num_voters=num_voters, parties=parties)
 
         self.getAvgs()
 
+        self.party_affinity = {party.name: getPartyAffinity(self, party) for party in parties}
+
     def __repr__(self):
-        return f"Region(name={self.name}, preferences={self.preferences}, weights={self.weights})"
+        return f"Region(\nname={self.name},\npreferences={self.preferences},\nweights={self.weights},\nage={self.age}, \nincome={self.income}, \nturnout_probability={self.turnout_probability}, \nparty_affinity={self.party_affinity})"
 
 class World:
     def __init__(self, regions):
-        self.regions = [Region(name=region, num_voters=REGION_VOTERS) for region in regions]
+        self.parties = [Party(name) for name in DEFAULT_PARTY_PREFERENCES.keys()]
+        self.regions = [Region(name=region, num_voters=REGION_VOTERS, parties=self.parties) for region in regions]
 
     def __repr__(self):
         return f"World(regions={self.regions})"

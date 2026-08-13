@@ -1,10 +1,12 @@
 import numpy as np
-from settings import EDUCATION_LEVELS, EDUCATION_WEIGHTS, REGION_VOTERS, DEFAULT_REGIONAL_LEAN
-from simulation.preferencesweights import Preferences, Weights
 
+from settings import EDUCATION_LEVELS, EDUCATION_WEIGHTS, REGION_VOTERS, DEFAULT_REGIONAL_LEAN, DEFAULT_PARTIES, DEFAULT_PARTY_PREFERENCES, DEFAULT_CANDIDATES
+from simulation.preferencesweights import Preferences, Weights
+from simulation.parties import getPartyAffinity
 
 class Voter:
-    def __init__(self, id, name, age, region):
+
+    def __init__(self, id, name, age, region, parties):
         self.id = id
         self.name = name
         self.age = age
@@ -45,6 +47,9 @@ class Voter:
             infrastructure=region_weights.get("infrastructure", 0.5) + np.random.normal(0, region_variation)
         )
 
+
+        self.party_affinity = {party.name: getPartyAffinity(self, party) for party in parties}
+
     def __repr__(self):
         return f"Voter(id={self.id}, name='{self.name}', age={self.age}, income={self.income}, education='{self.education}', region='{self.region}', turnout_probability={self.turnout_probability}, preferences={self.preferences}, weights={self.weights})"
 
@@ -54,12 +59,12 @@ class VoterList:
         self.next = None
         self.prev = None
 
-def GenerateVoterList(region, num_voters):
+def GenerateVoterList(region, num_voters, parties):
     head = None
     tail = None
 
     for i in range(num_voters):
-        voter = Voter(id=i, name=f"Voter {i}", age=np.random.randint(18, 80), region=region)
+        voter = Voter(id=i, name=f"Voter {i}", age=np.random.randint(18, 80), region=region, parties=parties)
         new_node = VoterList(voter)
 
         if head is None:
