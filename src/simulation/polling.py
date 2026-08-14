@@ -64,3 +64,13 @@ class Poll:
         self.results = results
 
     
+def runNationalPoll(pollster, sample, regions):
+    voters = []
+    for region in regions:
+        voters.append(region.voter_list)
+    
+    poll = Poll(pollster, sample, voters)
+
+    poll.run_poll
+
+    return poll
