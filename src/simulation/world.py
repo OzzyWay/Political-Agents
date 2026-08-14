@@ -1,4 +1,4 @@
-from simulation.voters import Voter, VoterList, GenerateVoterList
+from simulation.voters import Voter, GenerateVoterList
 from simulation.preferencesweights import Preferences, Weights
 from simulation.parties import Party, Candidate, getPartyAffinity
 from settings import REGION_VOTERS, DEFAULT_REGIONS, DEFAULT_PARTY_PREFERENCES, DEFAULT_CANDIDATES
@@ -7,14 +7,13 @@ from settings import REGION_VOTERS, DEFAULT_REGIONS, DEFAULT_PARTY_PREFERENCES, 
 class Region:
 
     def getAvgs(self):
-        current = self.voter_list
         count = 0
 
         self.preferences = Preferences(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         self.weights = Weights(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
-        while current is not None:
-            voter = current.voter
+        for i in range(self.voter_list.__len__()):
+            voter = self.voter_list[i]
 
             self.age += voter.age
             self.turnout_probability += voter.turnout_probability
@@ -43,7 +42,6 @@ class Region:
             self.weights.infrastructure += voter.weights.infrastructure
 
             count += 1
-            current = current.next
 
         self.age /= count
         self.turnout_probability /= count

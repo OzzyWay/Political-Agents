@@ -13,7 +13,7 @@ EDUCATION_WEIGHTS = [0.032, 0.061, 0.289, 0.165, 0.099, 0.222, 0.099, 0.033]
 
 DEFAULT_REGIONS = ["North", "South", "East", "West"]
 
-REGION_VOTERS =  10000
+REGION_VOTERS =  1
 
 DEFAULT_REGIONAL_LEAN ={
         "North": {
@@ -161,7 +161,8 @@ DEFAULT_PARTY_PREFERENCES = {
         "government_size": 0.75,
         "foreign_policy": 0.60,
         "infrastructure": 0.80
-      }
+      },
+      "popularity": 0.8
     },
 
     "Republican Party": {
@@ -188,7 +189,8 @@ DEFAULT_PARTY_PREFERENCES = {
         "government_size": 0.85,
         "foreign_policy": 0.75,
         "infrastructure": 0.75
-      }
+      },
+      "popularity": 0.8
     },
 
     "Libertarian Party": {
@@ -215,7 +217,8 @@ DEFAULT_PARTY_PREFERENCES = {
         "government_size": 0.95,
         "foreign_policy": 0.80,
         "infrastructure": 0.55
-      }
+      },
+      "popularity": 0.1
     }
 }
 

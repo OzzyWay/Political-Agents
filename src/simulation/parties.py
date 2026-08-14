@@ -1,6 +1,6 @@
 from settings import DEFAULT_PARTY_PREFERENCES, DEFAULT_PARTIES, DEFAULT_CANDIDATES
 from simulation.preferencesweights import Preferences, Weights
-
+import numpy as np
 
 def getPartyAffinity(target, party):
     score = 0
@@ -91,6 +91,7 @@ class Candidate:
 class Party:
     def __init__(self, name):
         self.name = name
+        self.popularity = DEFAULT_PARTY_PREFERENCES[name]["popularity"]
         self.preferences = Preferences(DEFAULT_PARTY_PREFERENCES[name]["preferences"]["economy"],
                                        DEFAULT_PARTY_PREFERENCES[name]["preferences"]["taxes"],
                                        DEFAULT_PARTY_PREFERENCES[name]["preferences"]["healthcare"],

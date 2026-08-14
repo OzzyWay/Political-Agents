@@ -11,7 +11,7 @@ class Voter:
         self.name = name
         self.age = age
         self.income = round(np.random.lognormal(mean=np.log(65000), sigma=0.6))
-        self.education = np.random.choice(EDUCATION_LEVELS, size=EDUCATION_LEVELS.__len__(),p=EDUCATION_WEIGHTS)
+        self.education = np.random.choice(EDUCATION_LEVELS, p=EDUCATION_WEIGHTS)
         self.region = region
 
         self.turnout_probability = np.clip(np.random.normal(loc=0.6, scale=0.1), 0, 1)
@@ -51,28 +51,14 @@ class Voter:
         self.party_affinity = {party.name: getPartyAffinity(self, party) for party in parties}
 
     def __repr__(self):
-        return f"Voter(id={self.id}, name='{self.name}', age={self.age}, income={self.income}, education='{self.education}', region='{self.region}', turnout_probability={self.turnout_probability}, preferences={self.preferences}, weights={self.weights})"
+        return f"Voter(id={self.id}, \nname='{self.name}', \nage={self.age}, \nincome={self.income}, education='{self.education}', \nregion='{self.region}', \nturnout_probability={self.turnout_probability}, \npreferences={self.preferences},\n weights={self.weights})\n"
 
-class VoterList:
-    def __init__(self, voter):
-        self.voter = voter
-        self.next = None
-        self.prev = None
+
 
 def GenerateVoterList(region, num_voters, parties):
-    head = None
-    tail = None
 
-    for i in range(num_voters):
-        voter = Voter(id=i, name=f"Voter {i}", age=np.random.randint(18, 80), region=region, parties=parties)
-        new_node = VoterList(voter)
+    voters = [Voter(id=i, name=f"Voter {i}", age=np.random.randint(18, 80), region=region, parties=parties) for i in range(num_voters)]
 
-        if head is None:
-            head = new_node
-            tail = new_node
-        else:
-            tail.next = new_node
-            new_node.prev = tail
-            tail = new_node
-
-    return head
+    for voter in voters:
+        print(voter)
+    return voters
