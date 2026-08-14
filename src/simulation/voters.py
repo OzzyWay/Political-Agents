@@ -61,6 +61,8 @@ class Voter:
 
         self.engagement = np.clip(0.35 * self.political_interest + 0.30 * self.issue_importance + 0.20 * self.political_knowledge + 0.15 * self.social_exposure,0,1)
 
+        self.turnout_probability = 1 / (1 + np.exp(-(-1.2+ 2.5 * self.engagement+ 0.8 * self.age_factor)))
+
     def calculate_score(self, party):
         
         policy_match = (((1-(abs(self.preferences.economy-party.candidate.preferences.economy)/2)))*self.weights.economy)+((1-(abs(self.preferences.tax-party.candidate.preferences.tax)/2))*self.weights.tax)+((1-(abs(self.preferences.healthcare-party.candidate.preferences.healthcare)/2))*self.weights.healthcare)+((1-(abs(self.preferences.education-party.candidate.preferences.education)/2))*self.weights.education)+((1-(abs(self.preferences.immigration-party.candidate.preferences.immigration)/2))*self.weights.immigration+(
