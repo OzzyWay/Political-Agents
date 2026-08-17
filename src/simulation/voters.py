@@ -48,6 +48,7 @@ class Voter:
             infrastructure=region_weights.get("infrastructure", 0.5) + np.random.normal(0, region_variation)
         )
         self.party_affinity = {party.name: getPartyAffinity(self, party) for party in parties}
+        self.candidate_affinity = {party.candidate.name: party.candidate.calculate_voter_affinity(self) for party in parties}
         self.age_factor = np.clip((self.age - 18) / 60, 0, 1)
         self.income_factor = np.clip(np.log(self.income / 20000) / 4, 0, 1)
 
