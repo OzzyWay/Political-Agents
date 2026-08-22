@@ -80,21 +80,21 @@ class CampaignAction:
 class ActionEffects:
 
     EFFECTIVENESS = {
-        ActionType.MEDIA_CAMPAIGN: 0.15,
-        ActionType.ISSUE_AD: 0.17,
-        ActionType.PHONE_BANK: 0.20,
-        ActionType.RALLY: 0.20,
-        ActionType.DOOR_TO_DOOR: 0.25,
-        ActionType.POLICY_SPEECH: 0.12,
-        ActionType.TOWN_HALL: 0.18,
-        ActionType.FUNDRAISING: 0.25,
+        ActionType.MEDIA_CAMPAIGN: 0.06,
+        ActionType.ISSUE_AD: 0.07,
+        ActionType.PHONE_BANK: 0.08,
+        ActionType.RALLY: 0.08,
+        ActionType.DOOR_TO_DOOR: 0.09,
+        ActionType.POLICY_SPEECH: 0.05,
+        ActionType.TOWN_HALL: 0.06,
+        ActionType.FUNDRAISING: 0.05,
         ActionType.VOTER_REGISTRATION: 0.0,
-        ActionType.OPPOSITION_RESEARCH: -0.12,
-        ActionType.SOCIAL_MEDIA: 0.08,
-        ActionType.ENDORSEMENT: 0.14,
-        ActionType.SURROGATE_VISIT: 0.16,
-        ActionType.DEBATE_PREP: 0.10,
-        ActionType.MICRO_TARGETING: 0.22,
+        ActionType.OPPOSITION_RESEARCH: -0.05,
+        ActionType.SOCIAL_MEDIA: 0.04,
+        ActionType.ENDORSEMENT: 0.05,
+        ActionType.SURROGATE_VISIT: 0.05,
+        ActionType.DEBATE_PREP: 0.04,
+        ActionType.MICRO_TARGETING: 0.07,
     }
 
     REACH = {
@@ -136,8 +136,8 @@ class ActionEffects:
     @staticmethod
     def get_voter_impact(action: CampaignAction, voter_engagement: float) -> float:
         base_effect = ActionEffects.EFFECTIVENESS.get(action.action_type, 0.0)
-        reach_factor = 0.55 + 0.45 * max(0.0, min(1.0, voter_engagement))
-        intensity_factor = 0.4 + 1.2 * action.intensity
+        reach_factor = 0.35 + 0.65 * max(0.0, min(1.0, voter_engagement))
+        intensity_factor = 0.25 + 0.75 * action.intensity
         effect = base_effect * reach_factor * intensity_factor
         return effect
 
@@ -151,20 +151,20 @@ class ActionEffects:
     @staticmethod
     def get_turnout_impact(action: CampaignAction) -> float:
         turnout_actions = {
-            ActionType.RALLY: 0.08,
-            ActionType.DOOR_TO_DOOR: 0.12,
-            ActionType.VOTER_REGISTRATION: 0.15,
-            ActionType.POLICY_SPEECH: 0.05,
-            ActionType.TOWN_HALL: 0.07,
-            ActionType.PHONE_BANK: 0.09,
-            ActionType.ISSUE_AD: 0.03,
-            ActionType.SURROGATE_VISIT: 0.06,
-            ActionType.DEBATE_PREP: 0.04,
-            ActionType.MICRO_TARGETING: 0.10,
-            ActionType.SOCIAL_MEDIA: 0.04,
+            ActionType.RALLY: 0.05,
+            ActionType.DOOR_TO_DOOR: 0.06,
+            ActionType.VOTER_REGISTRATION: 0.08,
+            ActionType.POLICY_SPEECH: 0.03,
+            ActionType.TOWN_HALL: 0.04,
+            ActionType.PHONE_BANK: 0.05,
+            ActionType.ISSUE_AD: 0.02,
+            ActionType.SURROGATE_VISIT: 0.03,
+            ActionType.DEBATE_PREP: 0.02,
+            ActionType.MICRO_TARGETING: 0.05,
+            ActionType.SOCIAL_MEDIA: 0.02,
         }
         base_impact = turnout_actions.get(action.action_type, 0.0)
-        return base_impact * (0.7 + action.intensity)
+        return base_impact * (0.45 + action.intensity)
 
     POPULARITY_IMPACT = {
         ActionType.MEDIA_CAMPAIGN: 0.10,

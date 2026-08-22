@@ -37,14 +37,14 @@ class CampaignEffects:
             voter_impact *= (0.8 + candidate_affinity * 0.8)
 
         if voter_impact > 0:
-            saturation = 1.0 - (candidate_affinity * 0.4)
-            voter_impact *= max(0.25, saturation)
+            persuasion_gap = max(0.10, 1.0 - candidate_affinity)
+            voter_impact *= persuasion_gap
         else:
-            hostility_penalty = 1.0 - candidate_affinity
-            voter_impact *= max(0.2, 0.7 + hostility_penalty * 0.6)
+            hostility_gap = max(0.10, candidate_affinity)
+            voter_impact *= hostility_gap
 
-        voter_impact = float(np.clip(voter_impact, -0.18, 0.18))
-        turnout_change = float(np.clip(turnout_change, -0.15, 0.20))
+        voter_impact = float(np.clip(voter_impact, -0.06, 0.06))
+        turnout_change = float(np.clip(turnout_change, -0.08, 0.12))
 
         return voter_impact, turnout_change
     
