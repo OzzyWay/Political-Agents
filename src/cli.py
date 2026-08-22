@@ -1,4 +1,3 @@
-import json
 import logging
 
 from simulation.campaignmanager import CampaignManager
@@ -8,11 +7,60 @@ from settings import (
     DEFAULT_CANDIDATES,
     DEFAULT_PARTY_PREFERENCES,
     DEFAULT_REGIONS,
-    REGION_VOTERS,
+    DEFAULT_REGIONAL_LEAN,
     LOG_PATH,
     load_settings,
     save_settings,
 )
+
+
+POLICY_KEYS = [
+    "economy",
+    "taxes",
+    "healthcare",
+    "education",
+    "immigration",
+    "environment",
+    "crime",
+    "government_size",
+    "foreign_policy",
+    "infrastructure",
+]
+
+
+def print_header(title):
+    print("\n" + "=" * 72)
+    print(f"{title:^{72}}")
+    print("=" * 72)
+
+
+def print_menu(title, options):
+    print_header(title)
+    for key, label in options.items():
+        print(f"  {key}. {label}")
+    print()
+
+
+def prompt_float(prompt, default):
+    raw = input(f"{prompt} [{default}]: ").strip()
+    if not raw:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        print("  Please enter a number.")
+        return prompt_float(prompt, default)
+
+
+def prompt_int(prompt, default):
+    raw = input(f"{prompt} [{default}]: ").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        print("  Please enter an integer.")
+        return prompt_int(prompt, default)
 
 
 def setup_logger(level_name: str = "INFO"):
@@ -72,53 +120,257 @@ def view_log():
     print("--- END LOG ---\n")
 
 
-def change_settings(settings):
-    while True:
-        print("\nSettings")
-        print("1. Regions")
-        print("2. Voters per region")
-        print("3. Campaign weeks")
-        print("4. Toggle AI")
-        print("5. AI model")
-        print("6. Save and return")
+def display_policy_dict(title, value_dict):
+    print(f"  {title}")
+    for key in POLICY_KEYS:
+        print(f"    - {key}: {value_dict.get(key, 0.0):.2f}")
 
+
+def update_policy_dict(target_dict, section_name):
+    while True:
+        print(f"\nEditing {section_name}")
+        for key in POLICY_KEYS:
+            print(f"  {key}: {target_dict.get(key, 0.0):.2f}")
+        print("  0. Back")
+        choice = input("Select a field to edit: ").strip()
+
+        if choice == "0":
+            return
+
+        if choice not in POLICY_KEYS:
+            print("  Invalid field.")
+            continue
+
+        target_dict[choice] = prompt_float(f"Set {choice}", target_dict.get(choice, 0.0))
+
+
+def edit_region_profiles(settings):
+    region_names = list(settings.get("regions", DEFAULT_REGIONS))
+    if not region_names:
+        print("No regions configured.")
+        return
+
+    while True:
+        print_menu("Regional model", {str(i): region for i, region in enumerate(region_names, 1)})
+        print("  0. Back")
+        choice = input("Choose a region: ").strip()
+
+        if choice == "0":
+            return
+
+        try:
+            index = int(choice) - 1
+            region_name = region_names[index]
+        except (ValueError, IndexError):
+            print("  Invalid selection.")
+            continue
+
+        region_data = DEFAULT_REGIONAL_LEAN.setdefault(region_name, {
+            "preferences": {key: 0.0 for key in POLICY_KEYS},
+            "weights": {key: 0.0 for key in POLICY_KEYS},
+            "variation": 0.1,
+        })
+
+        while True:
+            print_menu(f"Region: {region_name}", {
+                "1": "Preferences",
+                "2": "Weights",
+                "3": "Variation",
+                "0": "Back",
+            })
+            action = input("Select an option: ").strip()
+
+            if action == "1":
+                update_policy_dict(region_data.setdefault("preferences", {}), f"{region_name} preferences")
+            elif action == "2":
+                update_policy_dict(region_data.setdefault("weights", {}), f"{region_name} weights")
+            elif action == "3":
+                region_data["variation"] = prompt_float("Set regional variation", region_data.get("variation", 0.1))
+            elif action == "0":
+                break
+            else:
+                print("  Invalid choice.")
+
+
+def edit_party_profiles(settings):
+    party_names = list(DEFAULT_PARTY_PREFERENCES.keys())
+    if not party_names:
+        print("No parties configured.")
+        return
+
+    while True:
+        print_menu("Party profiles", {str(i): party for i, party in enumerate(party_names, 1)})
+        print("  0. Back")
+        choice = input("Choose a party: ").strip()
+
+        if choice == "0":
+            return
+
+        try:
+            index = int(choice) - 1
+            party_name = party_names[index]
+        except (ValueError, IndexError):
+            print("  Invalid selection.")
+            continue
+
+        party_data = DEFAULT_PARTY_PREFERENCES.setdefault(party_name, {
+            "preferences": {key: 0.0 for key in POLICY_KEYS},
+            "weights": {key: 0.0 for key in POLICY_KEYS},
+            "popularity": 0.5,
+        })
+
+        while True:
+            print_menu(f"Party: {party_name}", {
+                "1": "Preferences",
+                "2": "Weights",
+                "3": "Popularity",
+                "0": "Back",
+            })
+            action = input("Select an option: ").strip()
+
+            if action == "1":
+                update_policy_dict(party_data.setdefault("preferences", {}), f"{party_name} preferences")
+            elif action == "2":
+                update_policy_dict(party_data.setdefault("weights", {}), f"{party_name} weights")
+            elif action == "3":
+                party_data["popularity"] = prompt_float("Set popularity", party_data.get("popularity", 0.5))
+            elif action == "0":
+                break
+            else:
+                print("  Invalid choice.")
+
+
+def edit_candidate_profiles(settings):
+    candidate_names = [candidate["name"] for candidate in DEFAULT_CANDIDATES.values()]
+    if not candidate_names:
+        print("No candidates configured.")
+        return
+
+    while True:
+        print_menu("Candidate profiles", {str(i): name for i, name in enumerate(candidate_names, 1)})
+        print("  0. Back")
+        choice = input("Choose a candidate: ").strip()
+
+        if choice == "0":
+            return
+
+        try:
+            index = int(choice) - 1
+            candidate_name = candidate_names[index]
+        except (ValueError, IndexError):
+            print("  Invalid selection.")
+            continue
+
+        candidate_entry = next(
+            entry for entry in DEFAULT_CANDIDATES.values() if entry["name"] == candidate_name
+        )
+
+        while True:
+            print_menu(f"Candidate: {candidate_name}", {
+                "1": "Preferences",
+                "2": "Weights",
+                "3": "Traits",
+                "0": "Back",
+            })
+            action = input("Select an option: ").strip()
+
+            if action == "1":
+                update_policy_dict(candidate_entry.setdefault("preferences", {}), f"{candidate_name} preferences")
+            elif action == "2":
+                update_policy_dict(candidate_entry.setdefault("weights", {}), f"{candidate_name} weights")
+            elif action == "3":
+                trait_keys = sorted(candidate_entry.get("traits", {}).keys())
+                print("  Traits:")
+                for trait in trait_keys:
+                    print(f"    - {trait}: {candidate_entry['traits'][trait]:.2f}")
+                print("  0. Back")
+                sub = input("Choose a trait: ").strip()
+                if sub == "0":
+                    continue
+                if sub in candidate_entry.get("traits", {}):
+                    candidate_entry["traits"][sub] = prompt_float(f"Set {sub}", candidate_entry["traits"][sub])
+                else:
+                    print("  Invalid trait.")
+            elif action == "0":
+                break
+            else:
+                print("  Invalid choice.")
+
+
+def edit_runtime_settings(settings):
+    while True:
+        print_menu("Runtime settings", {
+            "1": "Regions",
+            "2": "Voters per region",
+            "3": "Campaign weeks",
+            "4": "Toggle AI",
+            "5": "AI model",
+            "6": "Log level",
+            "0": "Back",
+        })
         choice = input("Select an option: ").strip()
 
+        if choice == "0":
+            return
         if choice == "1":
-            raw_regions = input("Enter regions as comma-separated names (current: %s): " % ", ".join(settings["regions"]))
-            if raw_regions.strip():
+            raw_regions = input(f"Enter regions as a comma-separated list (current: {', '.join(settings['regions'])}): ").strip()
+            if raw_regions:
                 settings["regions"] = [region.strip() for region in raw_regions.split(",") if region.strip()]
         elif choice == "2":
-            value = input(f"Enter voters per region (current: {settings['voters_per_region']}): ")
-            if value.strip():
-                settings["voters_per_region"] = max(100, int(value))
+            settings["voters_per_region"] = prompt_int("Set voters per region", settings.get("voters_per_region", 10000))
         elif choice == "3":
-            value = input(f"Enter campaign weeks (current: {settings['campaign_weeks']}): ")
-            if value.strip():
-                settings["campaign_weeks"] = max(1, int(value))
+            settings["campaign_weeks"] = prompt_int("Set campaign weeks", settings.get("campaign_weeks", 8))
         elif choice == "4":
             settings["use_ai"] = not settings.get("use_ai", True)
-            print(f"AI mode is now {'ON' if settings['use_ai'] else 'OFF'}")
+            print(f"  AI mode is now {'ON' if settings['use_ai'] else 'OFF'}")
         elif choice == "5":
-            value = input(f"Enter AI model name (current: {settings.get('ai_model', 'llama2')}): ")
-            if value.strip():
-                settings["ai_model"] = value.strip()
+            settings["ai_model"] = input(f"Set AI model (current: {settings.get('ai_model', 'llama2')}): ").strip() or settings.get("ai_model", "llama2")
         elif choice == "6":
+            settings["log_level"] = input(f"Set log level (current: {settings.get('log_level', 'INFO')}): ").strip().upper() or settings.get("log_level", "INFO")
+        else:
+            print("  Invalid option.")
+
+
+def change_settings(settings):
+    while True:
+        print_menu("Configuration", {
+            "1": "Runtime settings",
+            "2": "Regional model",
+            "3": "Party profiles",
+            "4": "Candidate profiles",
+            "5": "Save and return",
+            "0": "Exit without saving",
+        })
+        choice = input("Select a configuration area: ").strip()
+
+        if choice == "1":
+            edit_runtime_settings(settings)
+        elif choice == "2":
+            edit_region_profiles(settings)
+        elif choice == "3":
+            edit_party_profiles(settings)
+        elif choice == "4":
+            edit_candidate_profiles(settings)
+        elif choice == "5":
             save_settings(settings)
+            print("  Settings saved.")
+            return
+        elif choice == "0":
             return
         else:
-            print("Invalid option.")
+            print("  Invalid option.")
 
 
 def show_runtime_config(settings):
-    print("\nCurrent project settings")
+    print_header("Current project settings")
     print(f"- Regions: {', '.join(settings['regions'])}")
     print(f"- Voters per region: {settings['voters_per_region']}")
     print(f"- Campaign weeks: {settings['campaign_weeks']}")
     print(f"- AI enabled: {'yes' if settings.get('use_ai', True) else 'no'}")
     print(f"- AI model: {settings.get('ai_model', 'llama2')}")
-    print(f"- Parties: {', '.join(settings.get('party_names', list(DEFAULT_PARTY_PREFERENCES.keys())))}")
-    print(f"- Candidates: {', '.join(settings.get('candidate_names', [candidate['name'] for candidate in DEFAULT_CANDIDATES.values()]))}")
+    print(f"- Log level: {settings.get('log_level', 'INFO')}")
+    print(f"- Parties: {', '.join(DEFAULT_PARTY_PREFERENCES.keys())}")
+    print(f"- Candidates: {', '.join(candidate['name'] for candidate in DEFAULT_CANDIDATES.values())}")
 
 
 def main():
@@ -126,13 +378,14 @@ def main():
     logger = setup_logger(settings.get("log_level", "INFO"))
 
     while True:
-        print("\nPolitical Agents Console")
-        print("1. Show current settings")
-        print("2. Run quick poll")
-        print("3. Run campaign simulation")
-        print("4. View log")
-        print("5. Change settings")
-        print("6. Exit")
+        print_menu("Political Agents Console", {
+            "1": "Show current settings",
+            "2": "Run quick poll",
+            "3": "Run campaign simulation",
+            "4": "View log",
+            "5": "Change settings",
+            "6": "Exit",
+        })
 
         choice = input("Choose an option: ").strip()
 
@@ -168,4 +421,4 @@ def main():
             break
 
         else:
-            print("Invalid input.")
+            print("  Invalid input.")
