@@ -370,7 +370,7 @@ DEFAULT_SETTINGS = {
     "regions": list(DEFAULT_REGIONS),
     "voters_per_region": int(REGION_VOTERS),
     "campaign_weeks": 8,
-    "polls_per_region": 1,
+    "poll_sample_size": 500,
     "use_ai": True,
     "ai_model": "llama2",
     "log_level": "INFO",
@@ -399,6 +399,8 @@ def load_settings():
     merged = DEFAULT_SETTINGS.copy()
     for key, value in raw.items():
         merged[key] = value
+    if "poll_sample_size" not in merged and "polls_per_region" in merged:
+        merged["poll_sample_size"] = merged["polls_per_region"]
     merged["regions"] = [str(region).strip() for region in merged.get("regions", DEFAULT_REGIONS) if str(region).strip()]
     if not merged["regions"]:
         merged["regions"] = DEFAULT_REGIONS.copy()

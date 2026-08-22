@@ -80,12 +80,12 @@ def log_message(logger, message: str):
     logger.info(message)
 
 
-def run_poll(world):
+def run_poll(world, sample_size=500):
     region = world.regions[0] if world.regions else None
     if region is None:
         raise ValueError("No regions available to simulate.")
 
-    poll = Poll("Regional", 1, region)
+    poll = Poll("Regional", max(1, int(sample_size)), region)
     poll.run_poll(world.parties)
     return poll.results
 
@@ -303,7 +303,7 @@ def edit_runtime_settings(settings):
             "1": "Regions",
             "2": "Voters per region",
             "3": "Campaign weeks",
-            "4": "Polls per region",
+            "4": "People per poll",
             "5": "Toggle AI",
             "6": "AI model",
             "7": "Log level",
@@ -322,7 +322,7 @@ def edit_runtime_settings(settings):
         elif choice == "3":
             settings["campaign_weeks"] = prompt_int("Set campaign weeks", settings.get("campaign_weeks", 8))
         elif choice == "4":
-            settings["polls_per_region"] = prompt_int("Set polls per region", settings.get("polls_per_region", 1))
+            settings["poll_sample_size"] = prompt_int("Set people per poll", settings.get("poll_sample_size", 500))
         elif choice == "5":
             settings["use_ai"] = not settings.get("use_ai", True)
             print(f"  AI mode is now {'ON' if settings['use_ai'] else 'OFF'}")
@@ -369,7 +369,7 @@ def show_runtime_config(settings):
     print(f"- Regions: {', '.join(settings['regions'])}")
     print(f"- Voters per region: {settings['voters_per_region']}")
     print(f"- Campaign weeks: {settings['campaign_weeks']}")
-    print(f"- Polls per region: {settings.get('polls_per_region', 1)}")
+    print(f"- People per poll: {settings.get('poll_sample_size', 500)}")
     print(f"- AI enabled: {'yes' if settings.get('use_ai', True) else 'no'}")
     print(f"- AI model: {settings.get('ai_model', 'llama2')}")
     print(f"- Log level: {settings.get('log_level', 'INFO')}")
@@ -399,7 +399,7 @@ def main():
         elif choice == "2":
             try:
                 world = World(regions=settings["regions"])
-                result = run_poll(world)
+                result = run_poll(world, settings.get("poll_sample_size", 500))
                 log_message(logger, f"Quick poll complete: {result}")
                 print(result)
             except Exception as exc:
