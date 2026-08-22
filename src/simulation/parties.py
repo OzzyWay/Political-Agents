@@ -90,7 +90,6 @@ class Candidate:
         self.regional_popularity = {}
 
     def calculate_appeal_score(self):
-        """Calculate overall candidate appeal based on traits (0-1 scale)."""
         trait_values = [
             self.traits.charisma,
             self.traits.debate_skill,
@@ -108,8 +107,6 @@ class Candidate:
         return np.mean(trait_values)
 
     def calculate_voter_affinity(self, voter):
-        """Calculate how much a specific voter likes this candidate (0-1 scale)."""
-        # Policy alignment component
         policy_match = (
             (1 - abs(voter.preferences.economy - self.preferences.economy) / 2) * voter.weights.economy +
             (1 - abs(voter.preferences.tax - self.preferences.tax) / 2) * voter.weights.tax +
@@ -122,33 +119,30 @@ class Candidate:
             (1 - abs(voter.preferences.foreign_policy - self.preferences.foreign_policy) / 2) * voter.weights.foreign_policy +
             (1 - abs(voter.preferences.infrastructure - self.preferences.infrastructure) / 2) * voter.weights.infrastructure
         ) / 10
-        
-        # Candidate traits appeal component
+
         candidate_appeal = self.calculate_appeal_score()
-        
-        # Combined affinity score (normalized to 0-1)
+
         voter_affinity = np.clip(0.7 * policy_match + 0.3 * candidate_appeal, 0, 1)
         return voter_affinity
 
     def calculate_regional_popularity(self, region):
-        """Calculate candidate popularity in a specific region based on voter affinity."""
         if not region.voter_list:
             return 0.0
-        
+
         total_affinity = sum(self.calculate_voter_affinity(voter) for voter in region.voter_list)
         regional_popularity = total_affinity / len(region.voter_list)
-        
-        # Store for reference
+
         self.regional_popularity[region.name] = regional_popularity
         return regional_popularity
 
     def get_regional_popularity(self, region_name):
-        """Get stored regional popularity for a specific region."""
         return self.regional_popularity.get(region_name, 0.0)
+
 
 class Party:
     def __init__(self, name):
         self.name = name
+        self.ideology = "moderate"
         self.popularity = DEFAULT_PARTY_PREFERENCES[name]["popularity"]
         self.preferences = Preferences(DEFAULT_PARTY_PREFERENCES[name]["preferences"]["economy"],
                                        DEFAULT_PARTY_PREFERENCES[name]["preferences"]["taxes"],
@@ -160,7 +154,7 @@ class Party:
                                        DEFAULT_PARTY_PREFERENCES[name]["preferences"]["government_size"],
                                        DEFAULT_PARTY_PREFERENCES[name]["preferences"]["foreign_policy"],
                                        DEFAULT_PARTY_PREFERENCES[name]["preferences"]["infrastructure"])
-        
+
         self.weights = Weights(DEFAULT_PARTY_PREFERENCES[name]["weights"]["economy"],
                               DEFAULT_PARTY_PREFERENCES[name]["weights"]["taxes"],
                               DEFAULT_PARTY_PREFERENCES[name]["weights"]["healthcare"],
@@ -173,6 +167,11 @@ class Party:
                               DEFAULT_PARTY_PREFERENCES[name]["weights"]["infrastructure"])
 
         self.candidate = Candidate(name)
+        self.candidate.party = self
+
+    def adjust_popularity(self, change):
+        self.popularity = max(0.05, min(1.75, self.popularity + change))
+        return self.popularity
 
     def __repr__(self):
         return f"Party(name={self.name}, ideology={self.ideology})"

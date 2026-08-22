@@ -86,7 +86,6 @@ class Region:
         return f"Region(\nname={self.name},\npreferences={self.preferences},\nweights={self.weights},\nage={self.age}, \nincome={self.income}, \nturnout_probability={self.turnout_probability}, \nparty_affinity={self.party_affinity},\ncandidate_popularity={self.candidate_popularity})"
 
     def get_candidate_popularity_details(self):
-        """Return a detailed breakdown of candidate popularity in this region."""
         details = {}
         for candidate_name, popularity_score in self.candidate_popularity.items():
             details[candidate_name] = {
@@ -96,7 +95,6 @@ class Region:
         return details
 
     def rank_candidates_by_popularity(self):
-        """Return candidates ranked by popularity in this region (highest to lowest)."""
         return sorted(self.candidate_popularity.items(), key=lambda x: x[1], reverse=True)
 
 class World:
