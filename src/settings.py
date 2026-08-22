@@ -370,6 +370,7 @@ DEFAULT_SETTINGS = {
     "regions": list(DEFAULT_REGIONS),
     "voters_per_region": int(REGION_VOTERS),
     "campaign_weeks": 8,
+    "polls_per_region": 1,
     "use_ai": True,
     "ai_model": "llama2",
     "log_level": "INFO",

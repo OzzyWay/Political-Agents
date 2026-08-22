@@ -303,9 +303,10 @@ def edit_runtime_settings(settings):
             "1": "Regions",
             "2": "Voters per region",
             "3": "Campaign weeks",
-            "4": "Toggle AI",
-            "5": "AI model",
-            "6": "Log level",
+            "4": "Polls per region",
+            "5": "Toggle AI",
+            "6": "AI model",
+            "7": "Log level",
             "0": "Back",
         })
         choice = input("Select an option: ").strip()
@@ -321,11 +322,13 @@ def edit_runtime_settings(settings):
         elif choice == "3":
             settings["campaign_weeks"] = prompt_int("Set campaign weeks", settings.get("campaign_weeks", 8))
         elif choice == "4":
+            settings["polls_per_region"] = prompt_int("Set polls per region", settings.get("polls_per_region", 1))
+        elif choice == "5":
             settings["use_ai"] = not settings.get("use_ai", True)
             print(f"  AI mode is now {'ON' if settings['use_ai'] else 'OFF'}")
-        elif choice == "5":
-            settings["ai_model"] = input(f"Set AI model (current: {settings.get('ai_model', 'llama2')}): ").strip() or settings.get("ai_model", "llama2")
         elif choice == "6":
+            settings["ai_model"] = input(f"Set AI model (current: {settings.get('ai_model', 'llama2')}): ").strip() or settings.get("ai_model", "llama2")
+        elif choice == "7":
             settings["log_level"] = input(f"Set log level (current: {settings.get('log_level', 'INFO')}): ").strip().upper() or settings.get("log_level", "INFO")
         else:
             print("  Invalid option.")
@@ -366,6 +369,7 @@ def show_runtime_config(settings):
     print(f"- Regions: {', '.join(settings['regions'])}")
     print(f"- Voters per region: {settings['voters_per_region']}")
     print(f"- Campaign weeks: {settings['campaign_weeks']}")
+    print(f"- Polls per region: {settings.get('polls_per_region', 1)}")
     print(f"- AI enabled: {'yes' if settings.get('use_ai', True) else 'no'}")
     print(f"- AI model: {settings.get('ai_model', 'llama2')}")
     print(f"- Log level: {settings.get('log_level', 'INFO')}")
