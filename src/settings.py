@@ -1,3 +1,10 @@
+import json
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+CONFIG_PATH = ROOT / "config" / "app_settings.json"
+LOG_PATH = ROOT / "logs" / "political_agents.log"
+
 EDUCATION_LEVELS = [
     "No High School",
     "Some High School, No Diploma",
@@ -15,7 +22,7 @@ EDUCATION_SCORE = [0.1, 0.2, 0.3, 0.4, 0.5 , 0.6, 0.7 ,0.8]
 
 DEFAULT_REGIONS = ["North", "South", "East", "West"]
 
-REGION_VOTERS =  10000
+REGION_VOTERS = 10000
 
 DEFAULT_REGIONAL_LEAN ={
         "North": {
@@ -356,5 +363,47 @@ DEFAULT_CANDIDATES = {
             "risk_tolerance": 0.88,
             "coalition_building": 0.45
         }
-        }
+    }
 }
+
+DEFAULT_SETTINGS = {
+    "regions": list(DEFAULT_REGIONS),
+    "voters_per_region": int(REGION_VOTERS),
+    "campaign_weeks": 8,
+    "use_ai": True,
+    "ai_model": "llama2",
+    "log_level": "INFO",
+    "party_names": list(DEFAULT_PARTY_PREFERENCES.keys()),
+    "candidate_names": [candidate["name"] for candidate in DEFAULT_CANDIDATES.values()],
+}
+
+
+def ensure_runtime_files():
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    if not CONFIG_PATH.exists():
+        CONFIG_PATH.write_text(json.dumps(DEFAULT_SETTINGS, indent=2), encoding="utf-8")
+    if not LOG_PATH.exists():
+        LOG_PATH.touch()
+
+
+def load_settings():
+    ensure_runtime_files()
+    try:
+        raw = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        raw = {}
+
+    merged = DEFAULT_SETTINGS.copy()
+    for key, value in raw.items():
+        merged[key] = value
+    merged["regions"] = [str(region).strip() for region in merged.get("regions", DEFAULT_REGIONS) if str(region).strip()]
+    if not merged["regions"]:
+        merged["regions"] = DEFAULT_REGIONS.copy()
+    return merged
+
+
+def save_settings(settings):
+    ensure_runtime_files()
+    CONFIG_PATH.write_text(json.dumps(settings, indent=2), encoding="utf-8")
