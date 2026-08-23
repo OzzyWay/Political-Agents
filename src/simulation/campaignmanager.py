@@ -3,9 +3,11 @@ import numpy as np
 
 from simulation.world import World
 from simulation.campaignstate import MultiCampaignTracker, WeeklyMetrics
-from simulation.campaignaction import CampaignAction, ActionType, ActionEffects
+from simulation.campaignaction import CampaignAction, ActionType, ActionEffects, DEFAULT_DIMINISHING_RETURN_DECAY
 from simulation.campaigneffects import CampaignEffects as VoteEffects
 from simulation.aiagent import CampaignAdvisor, StrategyAgent
+from simulation.mathutils import weighted_average, diminishing_return
+from simulation.preferencesweights import POLICY_KEYS
 
 
 class CampaignManager:
@@ -17,11 +19,13 @@ class CampaignManager:
         use_ai: bool = False,
         ai_model: str = "llama2",
         ai_strategies: Optional[Dict[str, str]] = None,
+        diminishing_return_decay: float = DEFAULT_DIMINISHING_RETURN_DECAY,
     ):
         self.world = world
         self.campaign_weeks = campaign_weeks
         self.starting_budget = starting_budget_per_candidate
         self.use_ai = use_ai
+        self.diminishing_return_decay = diminishing_return_decay
 
         self.tracker = MultiCampaignTracker(campaign_weeks)
         self.agents: Dict[str, Union[CampaignAdvisor, StrategyAgent]] = {}
@@ -41,20 +45,50 @@ class CampaignManager:
             agent.set_candidate(candidate.name)
             self.agents[candidate.name] = agent
 
+    def _region_populations(self) -> List[int]:
+        return [len(region.voter_list) for region in self.world.regions]
+
     def get_world_state_snapshot(self) -> Dict:
         state = {
             "week": self.tracker.current_week,
             "regional_affinity": {},
             "national_affinity": {},
-            "candidate_details": {}
+            "regional_turnout": {},
+            "regional_persuadable": {},
+            "issues": {},
+            "candidate_details": {},
         }
+
+        populations = self._region_populations()
 
         for region in self.world.regions:
             state["regional_affinity"][region.name] = {}
+            state["regional_turnout"][region.name] = float(
+                np.mean([voter.turnout_probability for voter in region.voter_list])
+            ) if region.voter_list else 0.0
+            if region.voter_list:
+                persuadable_count = sum(
+                    1 for voter in region.voter_list
+                    if max(voter.candidate_affinity.values(), default=0.5) < 0.65
+                )
+                state["regional_persuadable"][region.name] = persuadable_count / len(region.voter_list)
+            else:
+                state["regional_persuadable"][region.name] = 0.0
             for party in self.world.parties:
                 candidate = party.candidate
                 affinity = VoteEffects.calculate_regional_affinity(region, candidate.name)
                 state["regional_affinity"][region.name][candidate.name] = affinity
+
+        for key in POLICY_KEYS:
+            region_importances = []
+            for region in self.world.regions:
+                if region.voter_list:
+                    region_importances.append(
+                        float(np.mean([getattr(voter.weights, key) for voter in region.voter_list]))
+                    )
+                else:
+                    region_importances.append(0.0)
+            state["issues"][key] = {"importance": weighted_average(region_importances, populations)}
 
         for party in self.world.parties:
             candidate = party.candidate
@@ -62,7 +96,7 @@ class CampaignManager:
                 VoteEffects.calculate_regional_affinity(region, candidate.name)
                 for region in self.world.regions
             ]
-            state["national_affinity"][candidate.name] = np.mean(affinities)
+            state["national_affinity"][candidate.name] = weighted_average(affinities, populations)
 
         for party in self.world.parties:
             candidate = party.candidate
@@ -71,6 +105,7 @@ class CampaignManager:
                 "cash_on_hand": campaign.cash_on_hand,
                 "total_budget": campaign.starting_budget,
                 "actions_taken": len(campaign.actions_history),
+                "positions": candidate.preferences.as_dict(),
             }
 
         return state
@@ -115,16 +150,21 @@ class CampaignManager:
             campaign = self.tracker.get_candidate_campaign(candidate_name)
             candidate_results = []
 
-            for action_type, region, intensity in action_decisions:
+            for decision in action_decisions:
+                action_type, region, intensity = decision[0], decision[1], decision[2]
+                issue = decision[3] if len(decision) > 3 else None
+
                 action = CampaignAction(
                     action_type=action_type,
                     week=week,
                     region=region,
                     intensity=intensity,
+                    issue=issue,
                 )
 
                 if campaign.record_action(action):
-                    effects = self._apply_action(action, candidate_name)
+                    effects = self._apply_action(action, candidate_name, campaign)
+                    campaign.record_action_usage(action.action_type)
                     candidate_results.append({
                         "action": action.description,
                         "cost": action.cost,
@@ -136,25 +176,27 @@ class CampaignManager:
 
             action_results[candidate_name] = candidate_results
 
+        populations = self._region_populations()
+
         for party in self.world.parties:
             candidate = party.candidate
             campaign = self.tracker.get_candidate_campaign(candidate.name)
 
             regional_affinities = []
+            regional_vote_shares = []
             total_voters_reached = 0
-            total_vote_share = 0.0
 
             for region in self.world.regions:
                 affinity = VoteEffects.calculate_regional_affinity(region, candidate.name)
                 regional_affinities.append(affinity)
 
                 vote_share = VoteEffects.estimate_vote_share(region, candidate.name)
-                total_vote_share += vote_share
+                regional_vote_shares.append(vote_share)
 
                 total_voters_reached += len(region.voter_list)
 
-            avg_affinity = np.mean(regional_affinities) if regional_affinities else 0.5
-            avg_vote_share = total_vote_share / len(self.world.regions) if self.world.regions else 0.5
+            avg_affinity = weighted_average(regional_affinities, populations) if regional_affinities else 0.5
+            avg_vote_share = weighted_average(regional_vote_shares, populations) if regional_vote_shares else 0.5
 
             metrics = WeeklyMetrics(
                 week=week,
@@ -173,8 +215,14 @@ class CampaignManager:
             print(f"    Est. Vote Share: {summary['vote_share']}%")
             print(f"    Cash Remaining: ${summary['cash']:,.0f}")
 
-    def _apply_action(self, action: CampaignAction, candidate_name: str) -> Dict:
+    def _apply_action(self, action: CampaignAction, candidate_name: str, campaign) -> Dict:
         results = {}
+
+        party = next((party for party in self.world.parties if party.candidate.name == candidate_name), None)
+        candidate = party.candidate if party else None
+
+        previous_uses = campaign.get_previous_uses(action.action_type)
+        diminishing_multiplier = diminishing_return(previous_uses, self.diminishing_return_decay)
 
         affinity_by_region = {}
         for region in self.world.regions:
@@ -184,12 +232,10 @@ class CampaignManager:
             }
 
         if action.action_type == ActionType.FUNDRAISING:
-            campaign = self.tracker.get_candidate_campaign(candidate_name)
-            raised = ActionEffects.get_fundraising_revenue(action)
+            raised = ActionEffects.get_fundraising_revenue(action) * diminishing_multiplier
             campaign.cash_on_hand += raised
-            party = next((party for party in self.world.parties if party.candidate.name == candidate_name), None)
             if party:
-                popularity_delta = ActionEffects.get_popularity_impact(action)
+                popularity_delta = ActionEffects.get_popularity_impact(action) * diminishing_multiplier
                 party.adjust_popularity(popularity_delta)
                 results["fundraising"] = {
                     "raised": raised,
@@ -206,12 +252,14 @@ class CampaignManager:
                 }
             return results
 
-        popularity_delta = ActionEffects.get_popularity_impact(action)
-        party = next((party for party in self.world.parties if party.candidate.name == candidate_name), None)
+        popularity_delta = ActionEffects.get_popularity_impact(action) * diminishing_multiplier
         if party:
             party.adjust_popularity(popularity_delta)
             results["popularity_delta"] = popularity_delta
             results["popularity_after"] = party.popularity
+
+        if candidate is None:
+            return results
 
         if action.region:
             target_region = next((r for r in self.world.regions if r.name == action.region), None)
@@ -219,8 +267,10 @@ class CampaignManager:
                 avg_change, voters_reached = VoteEffects.apply_action_to_region(
                     action,
                     target_region.voter_list,
-                    candidate_name,
+                    candidate,
                     affinity_by_region[target_region.name],
+                    week=action.week,
+                    diminishing_multiplier=diminishing_multiplier,
                 )
 
                 for voter in target_region.voter_list:
@@ -235,8 +285,10 @@ class CampaignManager:
             national_results = VoteEffects.apply_national_action(
                 action,
                 self.world.regions,
-                candidate_name,
+                candidate,
                 affinity_by_region,
+                week=action.week,
+                diminishing_multiplier=diminishing_multiplier,
             )
 
             for region in self.world.regions:

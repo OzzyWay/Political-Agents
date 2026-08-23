@@ -5,6 +5,13 @@ from simulation.campaignaction import CampaignAction, ActionType, ActionEffects
 from simulation.campaignstate import CampaignState
 
 
+def top_issue(world_state: Dict) -> Optional[str]:
+    issues = world_state.get("issues", {})
+    if not issues:
+        return None
+    return max(issues.items(), key=lambda item: item[1].get("importance", 0.0))[0]
+
+
 class CampaignAdvisor:
     def __init__(self, model: str = "llama2", ollama_url: str = "http://localhost:11434"):
         self.model = model
@@ -39,9 +46,21 @@ class CampaignAdvisor:
         - Week: {campaign.current_week}/{campaign.total_weeks}
         - Cash on hand: ${campaign.cash_on_hand:,.0f}
         - Starting budget: ${campaign.starting_budget:,.0f}
+        - National affinity: {world_state.get('national_affinity', {}).get(campaign.candidate_name, 0.0):.1%}
 
-        CURRENT POLLING:
+        CURRENT POLLING (regional affinity, by candidate):
         {json.dumps(world_state.get('regional_affinity', {}), indent=2)}
+
+        REGIONAL TURNOUT (share of eligible voters expected to vote):
+        {json.dumps(world_state.get('regional_turnout', {}), indent=2)}
+
+        PERSUADABLE VOTERS (share of each region not yet strongly attached
+        to any candidate -- these are the voters worth targeting):
+        {json.dumps(world_state.get('regional_persuadable', {}), indent=2)}
+
+        ISSUE IMPORTANCE (how much the electorate cares about each issue,
+        0=nobody cares, 1=everyone cares a lot):
+        {json.dumps(world_state.get('issues', {}), indent=2)}
 
         RECENT ACTIONS:
         {self.summarize_recent_actions(campaign)}
@@ -97,10 +116,14 @@ class CampaignAdvisor:
         1. Action type (from available actions list)
         2. Region (or "NATIONAL" for national campaigns)
         3. Intensity (0.0-1.0, where higher intensity = higher cost and effect)
+        4. Issue (optional, e.g. "economy" or "healthcare") -- only relevant
+           for ISSUE_AD and POLICY_SPEECH, where it targets voters who care
+           about that specific issue.
 
         Consider:
         - Where are you strongest/weakest compared to opponents?
-        - Which regions can you flip with targeted campaigns?
+        - Which regions have the most persuadable voters?
+        - Which issues does the electorate care about most right now?
         - What's the ROI on each action type?
         - How much budget do you have left?
 
@@ -111,7 +134,8 @@ class CampaignAdvisor:
                 {{
                     "action": "MEDIA_CAMPAIGN",
                     "region": "North",
-                    "intensity": 0.7
+                    "intensity": 0.7,
+                    "issue": null
                 }}
             ]
         }}
@@ -134,7 +158,8 @@ class CampaignAdvisor:
                         region = None if region == "NATIONAL" else region
                         intensity = float(action_rec.get("intensity", 0.5))
                         intensity = max(0.0, min(1.0, intensity))
-                        actions.append((action_type, region, intensity))
+                        issue = action_rec.get("issue") or None
+                        actions.append((action_type, region, intensity, issue))
                     except (KeyError, ValueError):
                         continue
 
@@ -172,7 +197,7 @@ class CampaignAdvisor:
 
         if campaign.cash_on_hand > 50000:
             actions.append((ActionType.MEDIA_CAMPAIGN, None, 0.5))
-            actions.append((ActionType.ISSUE_AD, None, 0.5))
+            actions.append((ActionType.ISSUE_AD, None, 0.5, top_issue(world_state)))
 
         if campaign.cash_on_hand > 15000:
             actions.append((ActionType.SOCIAL_MEDIA, None, 0.4))
@@ -197,16 +222,16 @@ class StrategyAgent:
         max_actions: int = 3
     ) -> List[Tuple[ActionType, Optional[str], float]]:
         if self.strategy == "balanced":
-            return self.balanced(campaign, regions, max_actions)
+            return self.balanced(campaign, world_state, regions, max_actions)
         if self.strategy == "grassroots":
             return self.grassroots(campaign, regions, max_actions)
         if self.strategy == "media_blitz":
-            return self.media_blitz(campaign, regions, max_actions)
+            return self.media_blitz(campaign, world_state, regions, max_actions)
         if self.strategy == "targeted":
             return self.targeted(campaign, world_state, regions, max_actions)
-        return self.balanced(campaign, regions, max_actions)
+        return self.balanced(campaign, world_state, regions, max_actions)
 
-    def balanced(self, campaign: CampaignState, regions: List[str], max_actions: int) -> List:
+    def balanced(self, campaign: CampaignState, world_state: Dict, regions: List[str], max_actions: int) -> List:
         actions = []
         if campaign.cash_on_hand < 80000:
             actions.append((ActionType.FUNDRAISING, None, 0.7))
@@ -219,7 +244,7 @@ class StrategyAgent:
         if campaign.cash_on_hand > 10000:
             actions.append((ActionType.SOCIAL_MEDIA, None, 0.4))
         if campaign.cash_on_hand > 20000:
-            actions.append((ActionType.ISSUE_AD, None, 0.5))
+            actions.append((ActionType.ISSUE_AD, None, 0.5, top_issue(world_state)))
         return actions[:max_actions]
 
     def grassroots(self, campaign: CampaignState, regions: List[str], max_actions: int) -> List:
@@ -236,14 +261,14 @@ class StrategyAgent:
             actions.append((ActionType.PHONE_BANK, regions[0], 0.5))
         return actions[:max_actions]
 
-    def media_blitz(self, campaign: CampaignState, regions: List[str], max_actions: int) -> List:
+    def media_blitz(self, campaign: CampaignState, world_state: Dict, regions: List[str], max_actions: int) -> List:
         actions = []
         if campaign.cash_on_hand < 90000:
             actions.append((ActionType.FUNDRAISING, None, 0.7))
         if campaign.cash_on_hand > 80000:
             actions.append((ActionType.MEDIA_CAMPAIGN, None, 0.8))
         if campaign.cash_on_hand > 40000:
-            actions.append((ActionType.ISSUE_AD, None, 0.6))
+            actions.append((ActionType.ISSUE_AD, None, 0.6, top_issue(world_state)))
         if campaign.cash_on_hand > 20000:
             actions.append((ActionType.SOCIAL_MEDIA, None, 0.7))
         if campaign.cash_on_hand > 15000:
@@ -272,7 +297,7 @@ class StrategyAgent:
                 actions.append((ActionType.MICRO_TARGETING, sorted_regions[1][0], 0.5))
 
         if campaign.cash_on_hand > 50000:
-            actions.append((ActionType.ISSUE_AD, None, 0.5))
+            actions.append((ActionType.ISSUE_AD, None, 0.5, top_issue(world_state)))
 
         return actions[:max_actions]
 

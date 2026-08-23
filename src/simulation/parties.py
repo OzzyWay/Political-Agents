@@ -1,35 +1,40 @@
-from settings import DEFAULT_PARTY_PREFERENCES, DEFAULT_PARTIES, DEFAULT_CANDIDATES
+from typing import Dict
+
+from settings import DEFAULT_PARTY_PREFERENCES, DEFAULT_CANDIDATES
 from simulation.preferencesweights import Preferences, Weights
-import numpy as np
+from simulation.mathutils import clamp
+from simulation import scoring
 
-def getPartyAffinity(target, party):
-    score = 0
-    score += abs(target.preferences.economy - party.preferences.economy)
-    score += abs(target.preferences.tax - party.preferences.tax)
-    score += abs(target.preferences.healthcare - party.preferences.healthcare)
-    score += abs(target.preferences.education - party.preferences.education)
-    score += abs(target.preferences.immigration - party.preferences.immigration)
-    score += abs(target.preferences.environment - party.preferences.environment)
-    score += abs(target.preferences.crime - party.preferences.crime)
-    score += abs(target.preferences.government_size - party.preferences.government_size)
-    score += abs(target.preferences.foreign_policy - party.preferences.foreign_policy)
-    score += abs(target.preferences.infrastructure - party.preferences.infrastructure)
 
-    score += abs(target.weights.economy - party.weights.economy)
-    score += abs(target.weights.tax - party.weights.tax)
-    score += abs(target.weights.healthcare - party.weights.healthcare)
-    score += abs(target.weights.education - party.weights.education)
-    score += abs(target.weights.immigration - party.weights.immigration)
-    score += abs(target.weights.environment - party.weights.environment)
-    score += abs(target.weights.crime - party.weights.crime)
-    score += abs(target.weights.government_size - party.weights.government_size)
-    score += abs(target.weights.foreign_policy - party.weights.foreign_policy)
-    score += abs(target.weights.infrastructure - party.weights.infrastructure)
+def getPartyAffinity(target, party) -> float:
+    """How closely `target` (a Voter or Region) matches `party`'s platform.
 
-    return score
+    Returns a value in [0, 1] where 1.0 is a perfect ideological match.
+    Kept as a thin wrapper around scoring.calculate_party_affinity so
+    existing callers (Region, Voter) don't need to import scoring directly.
+    """
+    return scoring.calculate_party_affinity(target, party)
+
 
 class CandidateTraits:
-    def __init__(self, charisma, debate_skill, media_skill, fundraising, organization, discipline, persuasion, leadership, authenticity, experience, risk_tolerance, coalition_building):
+    TRAIT_NAMES = [
+        "charisma",
+        "debate_skill",
+        "media_skill",
+        "fundraising",
+        "organization",
+        "discipline",
+        "persuasion",
+        "leadership",
+        "authenticity",
+        "experience",
+        "risk_tolerance",
+        "coalition_building",
+    ]
+
+    def __init__(self, charisma, debate_skill, media_skill, fundraising, organization,
+                 discipline, persuasion, leadership, authenticity, experience,
+                 risk_tolerance, coalition_building):
         self.charisma = charisma
         self.debate_skill = debate_skill
         self.media_skill = media_skill
@@ -43,89 +48,58 @@ class CandidateTraits:
         self.risk_tolerance = risk_tolerance
         self.coalition_building = coalition_building
 
+    def get(self, trait_name: str, default: float = 0.5) -> float:
+        return getattr(self, trait_name, default)
+
     def __repr__(self):
-        return f"CandidateTraits(charisma={self.charisma}, debate_skill={self.debate_skill}, media_skill={self.media_skill}, fundraising={self.fundraising}, organization={self.organization}, discipline={self.discipline}, persuasion={self.persuasion}, leadership={self.leadership}, authenticity={self.authenticity}, experience={self.experience}, risk_tolerance={self.risk_tolerance}, coalition_building={self.coalition_building})"
+        return (
+            f"CandidateTraits(charisma={self.charisma}, debate_skill={self.debate_skill}, "
+            f"media_skill={self.media_skill}, fundraising={self.fundraising}, "
+            f"organization={self.organization}, discipline={self.discipline}, "
+            f"persuasion={self.persuasion}, leadership={self.leadership}, "
+            f"authenticity={self.authenticity}, experience={self.experience}, "
+            f"risk_tolerance={self.risk_tolerance}, coalition_building={self.coalition_building})"
+        )
 
 
 class Candidate:
     def __init__(self, party):
-        self.name = DEFAULT_CANDIDATES[party]["name"]
+        data = DEFAULT_CANDIDATES[party]
+        self.name = data["name"]
         self.party = party
-        self.preferences = Preferences(DEFAULT_CANDIDATES[party]["preferences"]["economy"],
-                                       DEFAULT_CANDIDATES[party]["preferences"]["taxes"],
-                                       DEFAULT_CANDIDATES[party]["preferences"]["healthcare"],
-                                       DEFAULT_CANDIDATES[party]["preferences"]["education"],
-                                       DEFAULT_CANDIDATES[party]["preferences"]["immigration"],
-                                       DEFAULT_CANDIDATES[party]["preferences"]["environment"],
-                                       DEFAULT_CANDIDATES[party]["preferences"]["crime"],
-                                       DEFAULT_CANDIDATES[party]["preferences"]["government_size"],
-                                       DEFAULT_CANDIDATES[party]["preferences"]["foreign_policy"],
-                                       DEFAULT_CANDIDATES[party]["preferences"]["infrastructure"])
 
-        self.weights = Weights(DEFAULT_CANDIDATES[party]["weights"]["economy"],
-                               DEFAULT_CANDIDATES[party]["weights"]["taxes"],
-                               DEFAULT_CANDIDATES[party]["weights"]["healthcare"],
-                               DEFAULT_CANDIDATES[party]["weights"]["education"],
-                               DEFAULT_CANDIDATES[party]["weights"]["immigration"],
-                               DEFAULT_CANDIDATES[party]["weights"]["environment"],
-                               DEFAULT_CANDIDATES[party]["weights"]["crime"],
-                               DEFAULT_CANDIDATES[party]["weights"]["government_size"],
-                               DEFAULT_CANDIDATES[party]["weights"]["foreign_policy"],
-                               DEFAULT_CANDIDATES[party]["weights"]["infrastructure"])
+        prefs = data["preferences"]
+        self.preferences = Preferences(
+            prefs["economy"], prefs["taxes"], prefs["healthcare"], prefs["education"],
+            prefs["immigration"], prefs["environment"], prefs["crime"],
+            prefs["government_size"], prefs["foreign_policy"], prefs["infrastructure"],
+        )
 
-        self.traits = CandidateTraits(DEFAULT_CANDIDATES[party]["traits"]["charisma"],
-                                      DEFAULT_CANDIDATES[party]["traits"]["debate_skill"],
-                                      DEFAULT_CANDIDATES[party]["traits"]["media_skill"],
-                                      DEFAULT_CANDIDATES[party]["traits"]["fundraising"],
-                                      DEFAULT_CANDIDATES[party]["traits"]["organization"],
-                                      DEFAULT_CANDIDATES[party]["traits"]["discipline"],
-                                      DEFAULT_CANDIDATES[party]["traits"]["persuasion"],
-                                      DEFAULT_CANDIDATES[party]["traits"]["leadership"],
-                                      DEFAULT_CANDIDATES[party]["traits"]["authenticity"],
-                                      DEFAULT_CANDIDATES[party]["traits"]["experience"],
-                                      DEFAULT_CANDIDATES[party]["traits"]["risk_tolerance"],
-                                      DEFAULT_CANDIDATES[party]["traits"]["coalition_building"])
-                                    
+        weights = data["weights"]
+        self.weights = Weights(
+            weights["economy"], weights["taxes"], weights["healthcare"], weights["education"],
+            weights["immigration"], weights["environment"], weights["crime"],
+            weights["government_size"], weights["foreign_policy"], weights["infrastructure"],
+        )
+
+        traits = data["traits"]
+        self.traits = CandidateTraits(
+            traits["charisma"], traits["debate_skill"], traits["media_skill"],
+            traits["fundraising"], traits["organization"], traits["discipline"],
+            traits["persuasion"], traits["leadership"], traits["authenticity"],
+            traits["experience"], traits["risk_tolerance"], traits["coalition_building"],
+        )
+
         self.money = 0
-        self.regional_popularity = {}
+        self.regional_popularity: Dict[str, float] = {}
 
-    def calculate_appeal_score(self):
-        trait_values = [
-            self.traits.charisma,
-            self.traits.debate_skill,
-            self.traits.media_skill,
-            self.traits.fundraising,
-            self.traits.organization,
-            self.traits.discipline,
-            self.traits.persuasion,
-            self.traits.leadership,
-            self.traits.authenticity,
-            self.traits.experience,
-            self.traits.risk_tolerance,
-            self.traits.coalition_building
-        ]
-        return np.mean(trait_values)
+    def calculate_appeal_score(self) -> float:
+        return scoring.calculate_candidate_appeal(self)
 
-    def calculate_voter_affinity(self, voter):
-        policy_match = (
-            (1 - abs(voter.preferences.economy - self.preferences.economy) / 2) * voter.weights.economy +
-            (1 - abs(voter.preferences.tax - self.preferences.tax) / 2) * voter.weights.tax +
-            (1 - abs(voter.preferences.healthcare - self.preferences.healthcare) / 2) * voter.weights.healthcare +
-            (1 - abs(voter.preferences.education - self.preferences.education) / 2) * voter.weights.education +
-            (1 - abs(voter.preferences.immigration - self.preferences.immigration) / 2) * voter.weights.immigration +
-            (1 - abs(voter.preferences.environment - self.preferences.environment) / 2) * voter.weights.environment +
-            (1 - abs(voter.preferences.crime - self.preferences.crime) / 2) * voter.weights.crime +
-            (1 - abs(voter.preferences.government_size - self.preferences.government_size) / 2) * voter.weights.government_size +
-            (1 - abs(voter.preferences.foreign_policy - self.preferences.foreign_policy) / 2) * voter.weights.foreign_policy +
-            (1 - abs(voter.preferences.infrastructure - self.preferences.infrastructure) / 2) * voter.weights.infrastructure
-        ) / 10
+    def calculate_voter_affinity(self, voter) -> float:
+        return scoring.calculate_candidate_affinity(voter, self)
 
-        candidate_appeal = self.calculate_appeal_score()
-
-        voter_affinity = np.clip(0.7 * policy_match + 0.3 * candidate_appeal, 0, 1)
-        return voter_affinity
-
-    def calculate_regional_popularity(self, region):
+    def calculate_regional_popularity(self, region) -> float:
         if not region.voter_list:
             return 0.0
 
@@ -135,42 +109,39 @@ class Candidate:
         self.regional_popularity[region.name] = regional_popularity
         return regional_popularity
 
-    def get_regional_popularity(self, region_name):
+    def get_regional_popularity(self, region_name: str) -> float:
         return self.regional_popularity.get(region_name, 0.0)
 
 
 class Party:
+    MIN_POPULARITY = 0.0
+    MAX_POPULARITY = 1.0
+
     def __init__(self, name):
         self.name = name
         self.ideology = "moderate"
-        self.popularity = DEFAULT_PARTY_PREFERENCES[name]["popularity"]
-        self.preferences = Preferences(DEFAULT_PARTY_PREFERENCES[name]["preferences"]["economy"],
-                                       DEFAULT_PARTY_PREFERENCES[name]["preferences"]["taxes"],
-                                       DEFAULT_PARTY_PREFERENCES[name]["preferences"]["healthcare"],
-                                       DEFAULT_PARTY_PREFERENCES[name]["preferences"]["education"],
-                                       DEFAULT_PARTY_PREFERENCES[name]["preferences"]["immigration"],
-                                       DEFAULT_PARTY_PREFERENCES[name]["preferences"]["environment"],
-                                       DEFAULT_PARTY_PREFERENCES[name]["preferences"]["crime"],
-                                       DEFAULT_PARTY_PREFERENCES[name]["preferences"]["government_size"],
-                                       DEFAULT_PARTY_PREFERENCES[name]["preferences"]["foreign_policy"],
-                                       DEFAULT_PARTY_PREFERENCES[name]["preferences"]["infrastructure"])
+        data = DEFAULT_PARTY_PREFERENCES[name]
+        self.popularity = clamp(float(data["popularity"]), self.MIN_POPULARITY, self.MAX_POPULARITY)
 
-        self.weights = Weights(DEFAULT_PARTY_PREFERENCES[name]["weights"]["economy"],
-                              DEFAULT_PARTY_PREFERENCES[name]["weights"]["taxes"],
-                              DEFAULT_PARTY_PREFERENCES[name]["weights"]["healthcare"],
-                              DEFAULT_PARTY_PREFERENCES[name]["weights"]["education"],
-                              DEFAULT_PARTY_PREFERENCES[name]["weights"]["immigration"],
-                              DEFAULT_PARTY_PREFERENCES[name]["weights"]["environment"],
-                              DEFAULT_PARTY_PREFERENCES[name]["weights"]["crime"],
-                              DEFAULT_PARTY_PREFERENCES[name]["weights"]["government_size"],
-                              DEFAULT_PARTY_PREFERENCES[name]["weights"]["foreign_policy"],
-                              DEFAULT_PARTY_PREFERENCES[name]["weights"]["infrastructure"])
+        prefs = data["preferences"]
+        self.preferences = Preferences(
+            prefs["economy"], prefs["taxes"], prefs["healthcare"], prefs["education"],
+            prefs["immigration"], prefs["environment"], prefs["crime"],
+            prefs["government_size"], prefs["foreign_policy"], prefs["infrastructure"],
+        )
+
+        weights = data["weights"]
+        self.weights = Weights(
+            weights["economy"], weights["taxes"], weights["healthcare"], weights["education"],
+            weights["immigration"], weights["environment"], weights["crime"],
+            weights["government_size"], weights["foreign_policy"], weights["infrastructure"],
+        )
 
         self.candidate = Candidate(name)
         self.candidate.party = self
 
-    def adjust_popularity(self, change):
-        self.popularity = max(0.05, min(1.75, self.popularity + change))
+    def adjust_popularity(self, change: float) -> float:
+        self.popularity = clamp(self.popularity + change, self.MIN_POPULARITY, self.MAX_POPULARITY)
         return self.popularity
 
     def __repr__(self):

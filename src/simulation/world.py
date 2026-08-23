@@ -98,9 +98,12 @@ class Region:
         return sorted(self.candidate_popularity.items(), key=lambda x: x[1], reverse=True)
 
 class World:
-    def __init__(self, regions):
+    def __init__(self, regions, voters_per_region: int = REGION_VOTERS):
         self.parties = [Party(name) for name in DEFAULT_PARTY_PREFERENCES.keys()]
-        self.regions = [Region(name=region, num_voters=REGION_VOTERS, parties=self.parties) for region in regions]
+        self.regions = [
+            Region(name=region, num_voters=voters_per_region, parties=self.parties)
+            for region in regions
+        ]
 
     def __repr__(self):
         return f"World(regions={self.regions})"

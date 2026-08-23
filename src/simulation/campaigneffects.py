@@ -1,7 +1,20 @@
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
-from simulation.campaignaction import CampaignAction, ActionType, ActionEffects
+
+from simulation.campaignaction import CampaignAction, ActionType, ActionEffects, ACTION_TRAIT_MAP
+from simulation.memory import CampaignMemory
 from simulation.voters import Voter
+from simulation.preferencesweights import POLICY_KEYS
+
+_ISSUE_ATTRIBUTE_ALIASES = {"taxes": "tax"}
+
+_MEMORY_THRESHOLD = 0.003
+
+
+def _issue_attribute(issue: str) -> str:
+    key = _ISSUE_ATTRIBUTE_ALIASES.get(issue, issue)
+    return key if key in POLICY_KEYS else "economy"
 
 
 class CampaignEffects:
@@ -13,13 +26,25 @@ class CampaignEffects:
     @staticmethod
     def get_popularity_impact(action: CampaignAction) -> float:
         return ActionEffects.get_popularity_impact(action)
-    
+
     @staticmethod
     def apply_action_to_voter(voter: Voter,
-                            candidate_name: str,
-                            action: CampaignAction,
-                            candidate_affinity: float) -> Tuple[float, float]:
+                               candidate,
+                               action: CampaignAction,
+                               candidate_affinity: float,
+                               week: int = 0,
+                               diminishing_multiplier: float = 1.0) -> Tuple[float, float]:
+        candidate_name = candidate.name
         voter_impact = ActionEffects.get_voter_impact(action, voter.engagement)
+
+        trait_name = ACTION_TRAIT_MAP.get(action.action_type)
+        if trait_name is not None:
+            candidate_trait = candidate.traits.get(trait_name, 0.5)
+            voter_impact *= (0.5 + candidate_trait)
+
+        if action.issue:
+            issue_importance = getattr(voter.weights, _issue_attribute(action.issue), 0.5)
+            voter_impact *= (0.35 + 0.65 * issue_importance)
 
         if action.action_type == ActionType.OPPOSITION_RESEARCH:
             knowledge_resistance = max(0.0, 1.0 - voter.political_knowledge)
@@ -43,22 +68,37 @@ class CampaignEffects:
             hostility_gap = max(0.10, candidate_affinity)
             voter_impact *= hostility_gap
 
+        voter_impact *= diminishing_multiplier
+        turnout_change *= diminishing_multiplier
+
         voter_impact = float(np.clip(voter_impact, -0.06, 0.06))
         turnout_change = float(np.clip(turnout_change, -0.08, 0.12))
 
+        if abs(voter_impact) >= _MEMORY_THRESHOLD:
+            voter.memory.remember(CampaignMemory(
+                candidate=candidate_name,
+                action=action.action_type.value,
+                effect=voter_impact,
+                week=week,
+                issue=action.issue,
+            ))
+
         return voter_impact, turnout_change
-    
+
     @staticmethod
     def apply_action_to_region(action: CampaignAction,
-                              region_voters: List[Voter],
-                              candidate_name: str,
-                              candidate_affinity_dict: Dict[str, float]) -> Tuple[float, int]:
+                                region_voters: List[Voter],
+                                candidate,
+                                candidate_affinity_dict: Dict[str, float],
+                                week: int = 0,
+                                diminishing_multiplier: float = 1.0) -> Tuple[float, int]:
         if not region_voters:
             return 0.0, 0
-        
+
+        candidate_name = candidate.name
         total_affinity_change = 0.0
         voters_affected = 0
-        
+
         reach_multiplier = ActionEffects.REACH.get(action.action_type, 1.0)
         base_reach = 0.18 + 0.22 * reach_multiplier * action.intensity
         reach_proportion = min(1.0, base_reach)
@@ -67,13 +107,18 @@ class CampaignEffects:
 
         if action.action_type == ActionType.DOOR_TO_DOOR:
             targeted_voters = np.random.choice(region_voters, size=num_voters_reached, replace=False)
-        elif action.action_type in [ActionType.MEDIA_CAMPAIGN, ActionType.ISSUE_AD, ActionType.SOCIAL_MEDIA]:
-            sorted_voters = sorted(region_voters, key=lambda v: v.engagement, reverse=True)
+        elif action.action_type in (ActionType.MEDIA_CAMPAIGN, ActionType.ISSUE_AD, ActionType.SOCIAL_MEDIA):
+            sort_key = (lambda v: (v.engagement, v.social_exposure)) if action.action_type == ActionType.SOCIAL_MEDIA \
+                else (lambda v: v.engagement)
+            sorted_voters = sorted(region_voters, key=sort_key, reverse=True)
             targeted_voters = sorted_voters[:num_voters_reached]
-        elif action.action_type in [ActionType.RALLY, ActionType.TOWN_HALL, ActionType.SURROGATE_VISIT]:
+        elif action.action_type in (ActionType.RALLY, ActionType.TOWN_HALL, ActionType.SURROGATE_VISIT):
             sorted_voters = sorted(region_voters, key=lambda v: v.political_interest, reverse=True)
             targeted_voters = sorted_voters[:num_voters_reached]
-        elif action.action_type in [ActionType.VOTER_REGISTRATION, ActionType.PHONE_BANK]:
+        elif action.action_type == ActionType.VOTER_REGISTRATION:
+            sorted_voters = sorted(region_voters, key=lambda v: v.turnout_probability)
+            targeted_voters = sorted_voters[:num_voters_reached]
+        elif action.action_type == ActionType.PHONE_BANK:
             sorted_voters = sorted(region_voters, key=lambda v: (v.turnout_probability, v.engagement), reverse=True)
             targeted_voters = sorted_voters[:num_voters_reached]
         elif action.action_type == ActionType.MICRO_TARGETING:
@@ -81,11 +126,11 @@ class CampaignEffects:
             targeted_voters = sorted_voters[:num_voters_reached]
         else:
             targeted_voters = np.random.choice(region_voters, size=num_voters_reached, replace=False)
-        
+
         for voter in targeted_voters:
             affinity = candidate_affinity_dict.get(voter.name, 0.5)
             affinity_change, turnout_change = CampaignEffects.apply_action_to_voter(
-                voter, candidate_name, action, affinity
+                voter, candidate, action, affinity, week=week, diminishing_multiplier=diminishing_multiplier,
             )
             total_affinity_change += affinity_change
             CampaignEffects.update_voter_turnout(voter, turnout_change)
@@ -93,11 +138,11 @@ class CampaignEffects:
 
         avg_change = total_affinity_change / voters_affected if voters_affected > 0 else 0.0
         return avg_change, voters_affected
-    
+
     @staticmethod
     def update_voter_affinity(voter: Voter,
-                             candidate_name: str,
-                             affinity_change: float) -> float:
+                               candidate_name: str,
+                               affinity_change: float) -> float:
         current_affinity = voter.candidate_affinity.get(candidate_name, 0.5)
         new_affinity = np.clip(current_affinity + affinity_change, 0.0, 1.0)
         voter.candidate_affinity[candidate_name] = new_affinity
@@ -110,40 +155,43 @@ class CampaignEffects:
 
     @staticmethod
     def apply_national_action(action: CampaignAction,
-                             regions: List,
-                             candidate_name: str,
-                             candidate_affinity_dict_by_region: Dict[str, Dict[str, float]]) -> Dict:
+                               regions: List,
+                               candidate,
+                               candidate_affinity_dict_by_region: Dict[str, Dict[str, float]],
+                               week: int = 0,
+                               diminishing_multiplier: float = 1.0) -> Dict:
         results = {}
-        
+
         for region in regions:
             affinity_dict = candidate_affinity_dict_by_region.get(region.name, {})
             avg_change, voters_reached = CampaignEffects.apply_action_to_region(
-                action, region.voter_list, candidate_name, affinity_dict
+                action, region.voter_list, candidate, affinity_dict,
+                week=week, diminishing_multiplier=diminishing_multiplier,
             )
             results[region.name] = {
                 "avg_affinity_change": avg_change,
                 "voters_reached": voters_reached,
-                "total_voters": len(region.voter_list)
+                "total_voters": len(region.voter_list),
             }
-        
+
         return results
-    
+
     @staticmethod
     def calculate_regional_affinity(region, candidate_name: str) -> float:
         if not region.voter_list:
             return 0.5
-        
+
         total_affinity = sum(
             voter.candidate_affinity.get(candidate_name, 0.5)
             for voter in region.voter_list
         )
         return total_affinity / len(region.voter_list)
-    
+
     @staticmethod
     def estimate_vote_share(region, candidate_name: str) -> float:
         total_votes = 0.0
         candidate_votes = 0.0
-        
+
         for voter in region.voter_list:
             turnout_weight = voter.turnout_probability
             affinity = voter.candidate_affinity.get(candidate_name, 0.5)
@@ -154,19 +202,19 @@ class CampaignEffects:
 
             total_votes += turnout_weight
             candidate_votes += turnout_weight * vote_probability
-        
+
         if total_votes == 0:
             return 0.5
-        
+
         return candidate_votes / total_votes
-    
+
     @staticmethod
     def get_action_results_summary(action: CampaignAction,
-                                   results: Dict[str, Dict]) -> str:
+                                    results: Dict[str, Dict]) -> str:
         total_reached = sum(r.get("voters_reached", 0) for r in results.values())
         avg_change = np.mean([r.get("avg_affinity_change", 0) for r in results.values()])
-        
+
         change_str = f"+{avg_change:.1%}" if avg_change >= 0 else f"{avg_change:.1%}"
-        
+
         summary = f"{action.description}: {total_reached:,} voters reached, avg affinity change {change_str}"
         return summary

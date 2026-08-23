@@ -25,10 +25,11 @@ class ActionType(Enum):
 class CampaignAction:
     action_type: ActionType
     week: int
-    region: Optional[str] = None  
+    region: Optional[str] = None
     cost: float = 0.0
-    intensity: float = 0.5 
+    intensity: float = 0.5
     description: str = ""
+    issue: Optional[str] = None
 
     def __post_init__(self):
         self._calculate_cost()
@@ -74,7 +75,31 @@ class CampaignAction:
             ActionType.DEBATE_PREP: f"{intensity_level.capitalize()} debate prep sprint",
             ActionType.MICRO_TARGETING: f"{intensity_level.capitalize()} micro-targeting push{region_str}",
         }
-        self.description = action_names.get(self.action_type, "Unknown action")
+        description = action_names.get(self.action_type, "Unknown action")
+        if self.issue:
+            description = f"{description} on {self.issue}"
+        self.description = description
+
+ACTION_TRAIT_MAP: Dict[ActionType, str] = {
+    ActionType.MEDIA_CAMPAIGN: "media_skill",
+    ActionType.ISSUE_AD: "persuasion",
+    ActionType.PHONE_BANK: "organization",
+    ActionType.RALLY: "charisma",
+    ActionType.DOOR_TO_DOOR: "organization",
+    ActionType.POLICY_SPEECH: "persuasion",
+    ActionType.TOWN_HALL: "authenticity",
+    ActionType.FUNDRAISING: "fundraising",
+    ActionType.VOTER_REGISTRATION: "organization",
+    ActionType.OPPOSITION_RESEARCH: "discipline",
+    ActionType.SOCIAL_MEDIA: "media_skill",
+    ActionType.ENDORSEMENT: "coalition_building",
+    ActionType.SURROGATE_VISIT: "coalition_building",
+    ActionType.DEBATE_PREP: "debate_skill",
+    ActionType.MICRO_TARGETING: "media_skill",
+}
+
+
+DEFAULT_DIMINISHING_RETURN_DECAY = 0.35
 
 
 class ActionEffects:

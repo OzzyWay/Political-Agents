@@ -44,6 +44,7 @@ class CampaignState:
         self.weekly_metrics: List[WeeklyMetrics] = []
         self.voter_affinity_changes: Dict[str, List[float]] = {}
         self.regional_affinity_history: Dict[str, List[float]] = {}
+        self.action_usage_counts: Dict[str, int] = {}
 
         self.is_active = True
         self.campaign_start_time = datetime.now()
@@ -61,6 +62,14 @@ class CampaignState:
         self.cash_on_hand -= action.cost
         self.actions_history.append(action)
         return True
+
+    def get_previous_uses(self, action_type) -> int:
+        key = action_type.value if hasattr(action_type, "value") else str(action_type)
+        return self.action_usage_counts.get(key, 0)
+
+    def record_action_usage(self, action_type):
+        key = action_type.value if hasattr(action_type, "value") else str(action_type)
+        self.action_usage_counts[key] = self.action_usage_counts.get(key, 0) + 1
 
     def record_weekly_metrics(self, metrics: WeeklyMetrics):
         metrics.cash_on_hand = self.cash_on_hand

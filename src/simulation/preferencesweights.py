@@ -1,31 +1,72 @@
+"""Standardized preference/weight containers.
+
+Preferences use the -1.0..+1.0 scale described in the improvement spec:
+    -1.0 = strongly favors position A
+     0.0 = neutral
+    +1.0 = strongly favors position B
+
+Weights (issue importance) use a separate 0.0..1.0 scale and are never
+mixed with the preference scale.
+
+Both containers clamp their values on construction so a bad upstream value
+(bad config, unclamped noise, etc.) can never silently propagate through
+the rest of the simulation as an out-of-range number.
+"""
+from dataclasses import dataclass
+
+from simulation.mathutils import clamp
+
+POLICY_KEYS = [
+    "economy",
+    "tax",
+    "healthcare",
+    "education",
+    "immigration",
+    "environment",
+    "crime",
+    "government_size",
+    "foreign_policy",
+    "infrastructure",
+]
+
+
+@dataclass
 class Preferences:
-    def __init__(self, economy, tax, healthcare, education, immigration, environment, crime, government_size, foreign_policy, infrastructure):
-        self.economy = economy
-        self.tax = tax
-        self.healthcare = healthcare
-        self.education = education
-        self.immigration = immigration
-        self.environment = environment
-        self.crime = crime
-        self.government_size = government_size
-        self.foreign_policy = foreign_policy
-        self.infrastructure = infrastructure
+    economy: float
+    tax: float
+    healthcare: float
+    education: float
+    immigration: float
+    environment: float
+    crime: float
+    government_size: float
+    foreign_policy: float
+    infrastructure: float
 
-    def __repr__(self):
-        return f"Preference(economy={self.economy},\ntax={self.tax},\nhealthcare={self.healthcare},\neducation={self.education},\nimmigration={self.immigration},\nenvironment={self.environment},\ncrime={self.crime},\ngovernment_size={self.government_size},\nforeign_policy={self.foreign_policy},\ninfrastructure={self.infrastructure})"
+    def __post_init__(self):
+        for key in POLICY_KEYS:
+            setattr(self, key, clamp(float(getattr(self, key)), -1.0, 1.0))
 
+    def as_dict(self):
+        return {key: getattr(self, key) for key in POLICY_KEYS}
+
+
+@dataclass
 class Weights:
-    def __init__(self, economy, tax, healthcare, education, immigration, environment, crime, government_size, foreign_policy, infrastructure):
-        self.economy = economy
-        self.tax = tax
-        self.healthcare = healthcare
-        self.education = education
-        self.immigration = immigration
-        self.environment = environment
-        self.crime = crime
-        self.government_size = government_size
-        self.foreign_policy = foreign_policy
-        self.infrastructure = infrastructure
+    economy: float
+    tax: float
+    healthcare: float
+    education: float
+    immigration: float
+    environment: float
+    crime: float
+    government_size: float
+    foreign_policy: float
+    infrastructure: float
 
-    def __repr__(self):
-        return f"Weights(economy={self.economy},\ntax={self.tax},\nhealthcare={self.healthcare},\neducation={self.education},\nimmigration={self.immigration},\nenvironment={self.environment},\ncrime={self.crime},\ngovernment_size={self.government_size},\nforeign_policy={self.foreign_policy},\ninfrastructure={self.infrastructure})"
+    def __post_init__(self):
+        for key in POLICY_KEYS:
+            setattr(self, key, clamp(float(getattr(self, key)), 0.0, 1.0))
+
+    def as_dict(self):
+        return {key: getattr(self, key) for key in POLICY_KEYS}

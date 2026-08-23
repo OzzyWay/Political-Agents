@@ -85,7 +85,7 @@ def run_poll(world, sample_size=500):
     if region is None:
         raise ValueError("No regions available to simulate.")
 
-    poll = Poll("Regional", max(1, int(sample_size)), region)
+    poll = Poll("Regional", max(1, int(sample_size)), region.voter_list)
     poll.run_poll(world.parties)
     return poll.results
 

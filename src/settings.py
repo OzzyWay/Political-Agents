@@ -1,5 +1,8 @@
 import json
+import random
 from pathlib import Path
+
+import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config" / "app_settings.json"
@@ -410,3 +413,18 @@ def load_settings():
 def save_settings(settings):
     ensure_runtime_files()
     CONFIG_PATH.write_text(json.dumps(settings, indent=2), encoding="utf-8")
+
+
+def set_global_seed(seed: int):
+    """Seed every RNG the simulation touches (Section 20).
+
+    The simulation currently draws randomness from Python's `random` module
+    and from numpy's global RNG state (np.random.*) throughout voters.py,
+    campaigneffects.py, voting.py, etc. Rather than thread an injected RNG
+    object through every constructor -- a much larger architectural change
+    -- this seeds both global RNGs so `Simulation(seed=42)` run twice
+    produces identical output, and different seeds produce different
+    outcomes.
+    """
+    random.seed(seed)
+    np.random.seed(seed)
