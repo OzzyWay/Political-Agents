@@ -130,11 +130,9 @@ def test_diminishing_returns_decreases_with_use():
 
 
 def test_national_weighting_respects_population():
-    # A tiny region should barely move the population-weighted average,
-    # while a plain mean would give it equal footing with the big one.
     big_value, small_value = 1.0, 0.0
     weighted = weighted_average([big_value, small_value], [1000, 1])
-    assert weighted > 0.99  # dominated by the big region
+    assert weighted > 0.99
     plain_mean = (big_value + small_value) / 2
     assert weighted != pytest.approx(plain_mean)
 
@@ -145,7 +143,7 @@ def test_national_poll_samples_flat_voter_list_and_produces_valid_results():
 
     assert all(hasattr(v, "region") for v in poll.sample)
     assert len(poll.sample) == 25
-    assert poll.results  # run_poll must actually have been called
+    assert poll.results
     assert sum(poll.results.values()) == 25
     for count in poll.results.values():
         assert count >= 0

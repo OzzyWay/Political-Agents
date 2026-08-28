@@ -41,6 +41,7 @@ class CampaignState:
         self.current_week = 0
 
         self.actions_history: List[CampaignAction] = []
+        self.events_history: List[str] = []
         self.weekly_metrics: List[WeeklyMetrics] = []
         self.voter_affinity_changes: Dict[str, List[float]] = {}
         self.regional_affinity_history: Dict[str, List[float]] = {}
@@ -70,6 +71,9 @@ class CampaignState:
     def record_action_usage(self, action_type):
         key = action_type.value if hasattr(action_type, "value") else str(action_type)
         self.action_usage_counts[key] = self.action_usage_counts.get(key, 0) + 1
+
+    def record_event(self, event_description: str):
+        self.events_history.append(event_description)
 
     def record_weekly_metrics(self, metrics: WeeklyMetrics):
         metrics.cash_on_hand = self.cash_on_hand

@@ -20,12 +20,14 @@ class CampaignManager:
         ai_model: str = "llama2",
         ai_strategies: Optional[Dict[str, str]] = None,
         diminishing_return_decay: float = DEFAULT_DIMINISHING_RETURN_DECAY,
+        events: Optional[List] = None,
     ):
         self.world = world
         self.campaign_weeks = campaign_weeks
         self.starting_budget = starting_budget_per_candidate
         self.use_ai = use_ai
         self.diminishing_return_decay = diminishing_return_decay
+        self.events = list(events or [])
 
         self.tracker = MultiCampaignTracker(campaign_weeks)
         self.agents: Dict[str, Union[CampaignAdvisor, StrategyAgent]] = {}
@@ -110,6 +112,17 @@ class CampaignManager:
 
         return state
 
+    def _apply_week_events(self, week: int):
+        party_by_candidate_name = {party.candidate.name: party for party in self.world.parties}
+        for event in self.events:
+            if getattr(event, "week", None) != week:
+                continue
+            summary = event.apply(self.world, party_by_candidate_name)
+            for candidate_name in [event.candidate_name]:
+                campaign = self.tracker.get_candidate_campaign(candidate_name)
+                if campaign is not None:
+                    campaign.record_event(summary.get("description", event.description))
+
     def run_campaign(self) -> Dict:
         print(f"\n{'='*80}")
         print(f"CAMPAIGN SIMULATION: {self.campaign_weeks} weeks")
@@ -120,6 +133,7 @@ class CampaignManager:
             print(f"\nWEEK {week}/{self.campaign_weeks}")
             print("-" * 80)
 
+            self._apply_week_events(week)
             self._run_week(week)
             self.tracker.advance_week()
 
