@@ -3,6 +3,7 @@ import logging
 from simulation.campaignmanager import CampaignManager
 from simulation.polling import Poll
 from simulation.world import World
+from simulation.events import CampaignEvent, EventType
 from settings import (
     DEFAULT_CANDIDATES,
     DEFAULT_PARTY_PREFERENCES,
@@ -98,18 +99,31 @@ def run_campaign(settings, logger):
     if prompt:
         for party in world.parties:
             ai_strategies[party.candidate.name] = {"prompt": prompt}
+    events_cfg = settings.get("events", [])
+    events = [CampaignEvent.from_dict(e) for e in events_cfg] if events_cfg else None
 
     manager = CampaignManager(
         world=world,
         campaign_weeks=int(settings["campaign_weeks"]),
-        starting_budget_per_candidate=500000,
+        starting_budget_per_candidate=settings.get("starting_budget_per_candidate"),
         use_ai=bool(settings.get("use_ai", True)),
         ai_model=str(settings.get("ai_model", "llama2")),
         ai_strategies=ai_strategies,
+        events=events,
     )
     log_message(logger, f"Starting campaign simulation for {len(settings['regions'])} regions and {settings['campaign_weeks']} weeks.")
     report = manager.run_campaign()
     log_message(logger, "Campaign simulation completed.")
+    try:
+        from simulation.voting import run_election
+        results = run_election(manager.world.regions, manager.world.parties)
+        log_message(logger, f"Election results: {results}")
+        print("\n--- ELECTION RESULTS ---")
+        for k, v in results.items():
+            print(f"  {k}: {v:.3%}")
+        print("--- END RESULTS ---\n")
+    except Exception as e:
+        log_message(logger, f"Election simulation failed: {e}")
     return report
 
 
@@ -531,6 +545,37 @@ def main():
             except Exception as exc:
                 log_message(logger, f"Campaign simulation failed: {exc}")
                 print(f"Campaign simulation failed: {exc}")
+        elif choice == "7":
+            try:
+                randomize = input("Create random events now? (y/n): ").strip().lower()
+                if randomize == "y":
+                    num = prompt_int("Number of events", 3)
+                    max_week = prompt_int("Max week (campaign weeks)", settings.get("campaign_weeks", 8))
+                    scandal_only = input("Scandals only? (y/n)").strip().lower() == "y"
+                    import random
+
+                    evs = []
+                    candidates = [c["name"] for c in DEFAULT_CANDIDATES.values()]
+                    regions = settings.get("regions", [])
+                    types = [EventType.SCANDAL] if scandal_only else list(EventType)
+                    for i in range(num):
+                        et = random.choice(types)
+                        week = random.randint(1, max(1, max_week))
+                        cand = random.choice(candidates)
+                        region = random.choice(regions + [None])
+                        affinity = -abs(random.uniform(0.05, 0.25)) if et == EventType.SCANDAL else random.uniform(-0.1, 0.1)
+                        popularity = -abs(random.uniform(0.01, 0.08)) if et == EventType.SCANDAL else random.uniform(-0.05, 0.05)
+                        ev = CampaignEvent(event_type=et, week=week, candidate_name=cand, region=region, affinity_delta=affinity, popularity_delta=popularity, description=f"Random {et.name.lower()} for {cand}")
+                        evs.append(ev.to_dict())
+                    settings["events"] = evs
+                    save_settings(settings)
+                    print(f"Saved {len(evs)} events to settings. Running campaign...")
+                    run_campaign(settings, logger)
+                else:
+                    print("Cancelled.")
+            except Exception as exc:
+                log_message(logger, f"Randomize events failed: {exc}")
+                print(f"Randomize events failed: {exc}")
 
         elif choice == "4":
             view_log()

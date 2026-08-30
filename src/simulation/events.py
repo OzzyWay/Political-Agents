@@ -63,3 +63,29 @@ class CampaignEvent:
                 summary["voters_affected"] += 1
 
         return summary
+
+    def to_dict(self) -> Dict:
+        return {
+            "event_type": self.event_type.name,
+            "week": int(self.week),
+            "candidate_name": self.candidate_name,
+            "region": self.region,
+            "affinity_delta": float(self.affinity_delta),
+            "popularity_delta": float(self.popularity_delta),
+            "turnout_delta": float(self.turnout_delta),
+            "description": self.description,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> "CampaignEvent":
+        et = EventType[data.get("event_type")] if data.get("event_type") in EventType.__members__ else EventType.NEWS_CYCLE
+        return cls(
+            event_type=et,
+            week=int(data.get("week", 1)),
+            candidate_name=data.get("candidate_name", ""),
+            region=data.get("region"),
+            affinity_delta=float(data.get("affinity_delta", 0.0)),
+            popularity_delta=float(data.get("popularity_delta", 0.0)),
+            turnout_delta=float(data.get("turnout_delta", 0.0)),
+            description=data.get("description", ""),
+        )
