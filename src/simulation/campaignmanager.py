@@ -9,6 +9,7 @@ from simulation.aiagent import CampaignAdvisor, StrategyAgent
 from simulation.style_parser import parse_prompt_to_style
 from simulation.mathutils import weighted_average, diminishing_return
 from simulation.preferencesweights import POLICY_KEYS
+from settings import load_settings
 
 
 class CampaignManager:
@@ -16,7 +17,7 @@ class CampaignManager:
         self,
         world: World,
         campaign_weeks: int,
-        starting_budget_per_candidate: float = 500000,
+        starting_budget_per_candidate: float = None,
         use_ai: bool = False,
         ai_model: str = "llama2",
         ai_strategies: Optional[Dict[str, str]] = None,
@@ -25,6 +26,12 @@ class CampaignManager:
     ):
         self.world = world
         self.campaign_weeks = campaign_weeks
+        cfg = load_settings()
+        if starting_budget_per_candidate is None:
+            starting_budget_per_candidate = float(cfg.get("starting_budget_per_candidate", 500000))
+        if diminishing_return_decay is None:
+            diminishing_return_decay = float(cfg.get("diminishing_return_decay", DEFAULT_DIMINISHING_RETURN_DECAY))
+
         self.starting_budget = starting_budget_per_candidate
         self.use_ai = use_ai
         self.diminishing_return_decay = diminishing_return_decay

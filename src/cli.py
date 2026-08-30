@@ -12,6 +12,7 @@ from settings import (
     load_settings,
     save_settings,
 )
+from simulation.campaignaction import ActionType
 
 
 POLICY_KEYS = [
@@ -315,6 +316,7 @@ def edit_runtime_settings(settings):
             "6": "AI model",
             "7": "Log level",
             "8": "Campaign style prompt",
+            "9": "Simulation parameters",
             "0": "Back",
         })
         choice = input("Select an option: ").strip()
@@ -341,6 +343,111 @@ def edit_runtime_settings(settings):
         elif choice == "8":
             raw_prompt = input(f"Set campaign style prompt (current present: {'yes' if settings.get('campaign_style_prompt') else 'no'}): ").strip()
             settings["campaign_style_prompt"] = raw_prompt or None
+        elif choice == "9":
+            sim = settings.setdefault("simulation", {})
+            while True:
+                print_menu("Simulation parameters", {
+                    "1": "Starting budget per candidate",
+                    "2": "Diminishing return decay",
+                    "3": "Fundraising params (JSON)",
+                    "4": "Base action costs (JSON)",
+                    "5": "Action effectiveness (JSON)",
+                    "6": "Per-action parameter editor",
+                    "0": "Back",
+                })
+                sub = input("Choose: ").strip()
+                if sub == "0":
+                    break
+                if sub == "1":
+                    val = input(f"Starting budget (current: {settings.get('starting_budget_per_candidate', 500000)}): ").strip()
+                    try:
+                        settings["starting_budget_per_candidate"] = float(val)
+                    except Exception:
+                        print("Invalid number.")
+                elif sub == "2":
+                    val = input(f"Diminishing return decay (current: {settings.get('diminishing_return_decay', 0.35)}): ").strip()
+                    try:
+                        settings["diminishing_return_decay"] = float(val)
+                    except Exception:
+                        print("Invalid number.")
+                elif sub in ("3", "4", "5"):
+                    key_map = {"3": "fundraising_params", "4": "base_action_costs", "5": "action_effectiveness"}
+                    key = key_map[sub]
+                    cur = settings.get(key)
+                    print(f"Current {key}: {cur}")
+                    raw = input("Enter JSON to replace or blank to cancel: ").strip()
+                    if not raw:
+                        continue
+                    try:
+                        import json
+
+                        parsed = json.loads(raw)
+                        settings[key] = parsed
+                    except Exception as e:
+                        print(f"Invalid JSON: {e}")
+                elif sub == "6":
+                    cfg = settings
+                    bac = cfg.setdefault("base_action_costs", {})
+                    eff = cfg.setdefault("action_effectiveness", {})
+                    reach = cfg.setdefault("action_reach", {})
+                    efficiency = cfg.setdefault("action_efficiency", {})
+                    pop = cfg.setdefault("action_popularity_impact", {})
+                    action_names = [at.name for at in ActionType]
+                    while True:
+                        menu = {str(i+1): name for i, name in enumerate(action_names)}
+                        menu["0"] = "Back"
+                        print_menu("Per-action editor", menu)
+                        choice_a = input("Choose action to edit: ").strip()
+                        if choice_a == "0":
+                            break
+                        try:
+                            idx = int(choice_a) - 1
+                            action_key = action_names[idx]
+                        except Exception:
+                            print("Invalid selection.")
+                            continue
+
+                        current = {
+                            "base_cost": bac.get(action_key, None),
+                            "effectiveness": eff.get(action_key, None),
+                            "reach": reach.get(action_key, None),
+                            "efficiency": efficiency.get(action_key, None),
+                            "popularity": pop.get(action_key, None),
+                        }
+                        print(f"Current for {action_key}: {current}")
+                        print("Enter new values or leave blank to keep current")
+                        val = input(f"Base cost (current {current['base_cost']}): ").strip()
+                        if val:
+                            try:
+                                bac[action_key] = float(val)
+                            except Exception:
+                                print("Invalid number for base cost.")
+                        val = input(f"Effectiveness (current {current['effectiveness']}): ").strip()
+                        if val:
+                            try:
+                                eff[action_key] = float(val)
+                            except Exception:
+                                print("Invalid number for effectiveness.")
+                        val = input(f"Reach (current {current['reach']}): ").strip()
+                        if val:
+                            try:
+                                reach[action_key] = float(val)
+                            except Exception:
+                                print("Invalid number for reach.")
+                        val = input(f"Efficiency (current {current['efficiency']}): ").strip()
+                        if val:
+                            try:
+                                efficiency[action_key] = float(val)
+                            except Exception:
+                                print("Invalid number for efficiency.")
+                        val = input(f"Popularity impact (current {current['popularity']}): ").strip()
+                        if val:
+                            try:
+                                pop[action_key] = float(val)
+                            except Exception:
+                                print("Invalid number for popularity.")
+                else:
+                    print("Invalid choice.")
         else:
             print("  Invalid option.")
 

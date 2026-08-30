@@ -1,6 +1,7 @@
 from enum import Enum
 from dataclasses import dataclass
 from typing import Dict, List, Optional
+from settings import load_settings
 
 
 class ActionType(Enum):
@@ -36,22 +37,11 @@ class CampaignAction:
         self._generate_description()
 
     def _calculate_cost(self):
+        cfg = load_settings()
+        base_costs_cfg = cfg.get("base_action_costs", {})
         base_costs = {
-            ActionType.MEDIA_CAMPAIGN: 50000,
-            ActionType.ISSUE_AD: 35000,
-            ActionType.PHONE_BANK: 12000,
-            ActionType.RALLY: 10000,
-            ActionType.DOOR_TO_DOOR: 5000,
-            ActionType.POLICY_SPEECH: 15000,
-            ActionType.TOWN_HALL: 8000,
-            ActionType.FUNDRAISING: 2000,
-            ActionType.VOTER_REGISTRATION: 3000,
-            ActionType.OPPOSITION_RESEARCH: 20000,
-            ActionType.SOCIAL_MEDIA: 8000,
-            ActionType.ENDORSEMENT: 30000,
-            ActionType.SURROGATE_VISIT: 6000,
-            ActionType.DEBATE_PREP: 18000,
-            ActionType.MICRO_TARGETING: 15000,
+            at: base_costs_cfg.get(at.name, 10000)
+            for at in ActionType
         }
         self.cost = base_costs.get(self.action_type, 10000) * (0.5 + self.intensity)
 
@@ -103,60 +93,11 @@ DEFAULT_DIMINISHING_RETURN_DECAY = 0.35
 
 
 class ActionEffects:
+    EFFECTIVENESS = {}
 
-    EFFECTIVENESS = {
-        ActionType.MEDIA_CAMPAIGN: 0.06,
-        ActionType.ISSUE_AD: 0.07,
-        ActionType.PHONE_BANK: 0.08,
-        ActionType.RALLY: 0.08,
-        ActionType.DOOR_TO_DOOR: 0.09,
-        ActionType.POLICY_SPEECH: 0.05,
-        ActionType.TOWN_HALL: 0.06,
-        ActionType.FUNDRAISING: 0.05,
-        ActionType.VOTER_REGISTRATION: 0.0,
-        ActionType.OPPOSITION_RESEARCH: -0.05,
-        ActionType.SOCIAL_MEDIA: 0.04,
-        ActionType.ENDORSEMENT: 0.05,
-        ActionType.SURROGATE_VISIT: 0.05,
-        ActionType.DEBATE_PREP: 0.04,
-        ActionType.MICRO_TARGETING: 0.07,
-    }
+    REACH = {}
 
-    REACH = {
-        ActionType.MEDIA_CAMPAIGN: 3.0,
-        ActionType.ISSUE_AD: 2.8,
-        ActionType.PHONE_BANK: 1.5,
-        ActionType.RALLY: 1.4,
-        ActionType.DOOR_TO_DOOR: 1.1,
-        ActionType.POLICY_SPEECH: 2.0,
-        ActionType.TOWN_HALL: 1.2,
-        ActionType.FUNDRAISING: 0.0,
-        ActionType.VOTER_REGISTRATION: 1.7,
-        ActionType.OPPOSITION_RESEARCH: 1.8,
-        ActionType.SOCIAL_MEDIA: 2.5,
-        ActionType.ENDORSEMENT: 1.6,
-        ActionType.SURROGATE_VISIT: 1.0,
-        ActionType.DEBATE_PREP: 1.4,
-        ActionType.MICRO_TARGETING: 2.1,
-    }
-
-    EFFICIENCY = {
-        ActionType.MEDIA_CAMPAIGN: 2.8,
-        ActionType.ISSUE_AD: 2.6,
-        ActionType.PHONE_BANK: 2.0,
-        ActionType.RALLY: 1.1,
-        ActionType.DOOR_TO_DOOR: 0.7,
-        ActionType.POLICY_SPEECH: 2.1,
-        ActionType.TOWN_HALL: 1.3,
-        ActionType.FUNDRAISING: 1.0,
-        ActionType.VOTER_REGISTRATION: 1.7,
-        ActionType.OPPOSITION_RESEARCH: 3.3,
-        ActionType.SOCIAL_MEDIA: 1.6,
-        ActionType.ENDORSEMENT: 3.8,
-        ActionType.SURROGATE_VISIT: 1.5,
-        ActionType.DEBATE_PREP: 1.8,
-        ActionType.MICRO_TARGETING: 2.3,
-    }
+    EFFICIENCY = {}
 
     @staticmethod
     def get_voter_impact(action: CampaignAction, voter_engagement: float) -> float:
@@ -192,32 +133,41 @@ class ActionEffects:
         return base_impact * (0.45 + action.intensity)
 
     POPULARITY_IMPACT = {
-        ActionType.MEDIA_CAMPAIGN: 0.10,
-        ActionType.ISSUE_AD: 0.12,
-        ActionType.PHONE_BANK: 0.08,
-        ActionType.RALLY: 0.09,
-        ActionType.DOOR_TO_DOOR: 0.11,
-        ActionType.POLICY_SPEECH: 0.07,
-        ActionType.TOWN_HALL: 0.08,
-        ActionType.FUNDRAISING: 0.04,
-        ActionType.VOTER_REGISTRATION: 0.06,
-        ActionType.OPPOSITION_RESEARCH: -0.08,
-        ActionType.SOCIAL_MEDIA: 0.09,
-        ActionType.ENDORSEMENT: 0.10,
-        ActionType.SURROGATE_VISIT: 0.07,
-        ActionType.DEBATE_PREP: 0.06,
-        ActionType.MICRO_TARGETING: 0.12,
     }
+
+
+# populate action parameter tables from settings
+cfg = load_settings()
+eff_cfg = cfg.get("action_effectiveness", {})
+reach_cfg = cfg.get("action_reach", {})
+efficiency_cfg = cfg.get("action_efficiency", {})
+pop_cfg = cfg.get("action_popularity_impact", {})
+
+for at in ActionType:
+    ActionEffects.EFFECTIVENESS[at] = float(eff_cfg.get(at.name, 0.0))
+    ActionEffects.REACH[at] = float(reach_cfg.get(at.name, 1.0))
+    ActionEffects.EFFICIENCY[at] = float(efficiency_cfg.get(at.name, 1.0))
+    ActionEffects.POPULARITY_IMPACT[at] = float(pop_cfg.get(at.name, 0.0))
 
     @staticmethod
     def get_fundraising_revenue(action: CampaignAction) -> float:
         if action.action_type != ActionType.FUNDRAISING:
             return 0.0
 
-        return 22000 + 27000 * action.intensity + 15000 * (0.5 + action.intensity)
+        cfg = load_settings()
+        params = cfg.get("fundraising_params", {"base": 22000, "intensity_scale": 27000, "bonus": 15000})
+        base = float(params.get("base", 22000))
+        intensity_scale = float(params.get("intensity_scale", 27000))
+        bonus = float(params.get("bonus", 15000))
+        return base + intensity_scale * action.intensity + bonus * (0.5 + action.intensity)
 
     @staticmethod
     def get_popularity_impact(action: CampaignAction) -> float:
+        if not ActionEffects.POPULARITY_IMPACT:
+            cfg = load_settings()
+            pop_cfg = cfg.get("action_popularity_impact", {})
+            for at in ActionType:
+                ActionEffects.POPULARITY_IMPACT[at] = float(pop_cfg.get(at.name, 0.0))
         base_impact = ActionEffects.POPULARITY_IMPACT.get(action.action_type, 0.0)
         intensity_factor = 0.5 + action.intensity
         total_impact = base_impact * intensity_factor
