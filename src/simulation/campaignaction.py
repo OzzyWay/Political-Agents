@@ -99,6 +99,8 @@ class ActionEffects:
 
     EFFICIENCY = {}
 
+    POPULARITY_IMPACT = {}
+
     @staticmethod
     def get_voter_impact(action: CampaignAction, voter_engagement: float) -> float:
         base_effect = ActionEffects.EFFECTIVENESS.get(action.action_type, 0.0)
@@ -132,23 +134,6 @@ class ActionEffects:
         base_impact = turnout_actions.get(action.action_type, 0.0)
         return base_impact * (0.45 + action.intensity)
 
-    POPULARITY_IMPACT = {
-    }
-
-
-# populate action parameter tables from settings
-cfg = load_settings()
-eff_cfg = cfg.get("action_effectiveness", {})
-reach_cfg = cfg.get("action_reach", {})
-efficiency_cfg = cfg.get("action_efficiency", {})
-pop_cfg = cfg.get("action_popularity_impact", {})
-
-for at in ActionType:
-    ActionEffects.EFFECTIVENESS[at] = float(eff_cfg.get(at.name, 0.0))
-    ActionEffects.REACH[at] = float(reach_cfg.get(at.name, 1.0))
-    ActionEffects.EFFICIENCY[at] = float(efficiency_cfg.get(at.name, 1.0))
-    ActionEffects.POPULARITY_IMPACT[at] = float(pop_cfg.get(at.name, 0.0))
-
     @staticmethod
     def get_fundraising_revenue(action: CampaignAction) -> float:
         if action.action_type != ActionType.FUNDRAISING:
@@ -172,3 +157,16 @@ for at in ActionType:
         intensity_factor = 0.5 + action.intensity
         total_impact = base_impact * intensity_factor
         return float(max(-0.25, min(0.25, total_impact)))
+
+# populate action parameter tables from settings
+cfg = load_settings()
+eff_cfg = cfg.get("action_effectiveness", {})
+reach_cfg = cfg.get("action_reach", {})
+efficiency_cfg = cfg.get("action_efficiency", {})
+pop_cfg = cfg.get("action_popularity_impact", {})
+
+for at in ActionType:
+    ActionEffects.EFFECTIVENESS[at] = float(eff_cfg.get(at.name, 0.0))
+    ActionEffects.REACH[at] = float(reach_cfg.get(at.name, 1.0))
+    ActionEffects.EFFICIENCY[at] = float(efficiency_cfg.get(at.name, 1.0))
+    ActionEffects.POPULARITY_IMPACT[at] = float(pop_cfg.get(at.name, 0.0))

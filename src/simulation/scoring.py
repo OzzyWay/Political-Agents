@@ -3,10 +3,14 @@ from __future__ import annotations
 from simulation.mathutils import clamp
 from simulation.preferencesweights import POLICY_KEYS
 
-POLICY_WEIGHT = 0.55
-CANDIDATE_WEIGHT = 0.15
-PARTY_WEIGHT = 0.15
-ENGAGEMENT_WEIGHT = 0.15
+from settings import load_settings
+
+cfg = load_settings()
+vw = cfg.get("voting_weights", {})
+POLICY_WEIGHT = float(vw.get("policy", 0.4))
+CANDIDATE_WEIGHT = float(vw.get("candidate", 0.1))
+PARTY_WEIGHT = float(vw.get("party", 0.4))
+ENGAGEMENT_WEIGHT = float(vw.get("engagement", 0.1))
 
 AFFINITY_POLICY_WEIGHT = 0.7
 AFFINITY_APPEAL_WEIGHT = 0.3

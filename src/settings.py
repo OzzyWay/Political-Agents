@@ -467,6 +467,12 @@ DEFAULT_SETTINGS = {
     "DEBATE_PREP": 0.06,
     "MICRO_TARGETING": 0.12
   },
+  "voting_weights": {
+    "policy": 0.4,
+    "candidate": 0.1,
+    "party": 0.4,
+    "engagement": 0.1
+  },
 }
 
 
