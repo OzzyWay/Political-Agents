@@ -207,8 +207,9 @@ class CampaignAdvisor:
 
 
 class StrategyAgent:
-    def __init__(self, strategy: str = "balanced"):
+    def __init__(self, strategy: str = "balanced", style_params: dict = None):
         self.strategy = strategy
+        self.style_params = style_params or {}
         self.candidate_name = None
 
     def set_candidate(self, candidate_name: str):
@@ -229,7 +230,38 @@ class StrategyAgent:
             return self.media_blitz(campaign, world_state, regions, max_actions)
         if self.strategy == "targeted":
             return self.targeted(campaign, world_state, regions, max_actions)
+        if self.strategy == "custom":
+            return self.custom(campaign, world_state, regions, max_actions)
         return self.balanced(campaign, world_state, regions, max_actions)
+
+    def custom(self, campaign: CampaignState, world_state: Dict, regions: List[str], max_actions: int) -> List:
+        fp = {k: float(v) for k, v in self.style_params.items()} if self.style_params else {}
+        fundraising = fp.get("fundraising", 0.2)
+        media = fp.get("media", 0.2)
+        ground = fp.get("ground", 0.2)
+        digital = fp.get("digital", 0.2)
+        attack = fp.get("attack", 0.2)
+
+        actions = []
+        if campaign.cash_on_hand < 15000 and fundraising > 0.1:
+            actions.append((ActionType.FUNDRAISING, None, min(1.0, 0.6 * fundraising + 0.4)))
+
+        if media > max(media, digital) and campaign.cash_on_hand > 20000:
+            actions.append((ActionType.MEDIA_CAMPAIGN, None, min(1.0, 0.5 * media + 0.2)))
+
+        if digital >= media and campaign.cash_on_hand > 12000:
+            actions.append((ActionType.SOCIAL_MEDIA, None, min(1.0, 0.6 * digital)))
+
+        if ground > 0.25 and campaign.cash_on_hand > 8000 and regions:
+            actions.append((ActionType.DOOR_TO_DOOR, regions[0], min(1.0, 0.5 * ground)))
+
+        if attack > 0.15 and campaign.cash_on_hand > 15000:
+            actions.append((ActionType.OPPOSITION_RESEARCH, None, min(1.0, 0.4 * attack + 0.2)))
+
+        if campaign.cash_on_hand > 20000 and (media + digital) > 0.4:
+            actions.append((ActionType.MICRO_TARGETING, None, min(1.0, 0.3 * (digital + media))))
+
+        return actions[:max_actions]
 
     def balanced(self, campaign: CampaignState, world_state: Dict, regions: List[str], max_actions: int) -> List:
         actions = []

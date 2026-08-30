@@ -6,6 +6,7 @@ from simulation.campaignstate import MultiCampaignTracker, WeeklyMetrics
 from simulation.campaignaction import CampaignAction, ActionType, ActionEffects, DEFAULT_DIMINISHING_RETURN_DECAY
 from simulation.campaigneffects import CampaignEffects as VoteEffects
 from simulation.aiagent import CampaignAdvisor, StrategyAgent
+from simulation.style_parser import parse_prompt_to_style
 from simulation.mathutils import weighted_average, diminishing_return
 from simulation.preferencesweights import POLICY_KEYS
 
@@ -41,8 +42,20 @@ class CampaignManager:
             if use_ai:
                 agent = CampaignAdvisor(model=ai_model)
             else:
-                strategy = ai_strategies.get(candidate.name, "balanced") if ai_strategies else "balanced"
-                agent = StrategyAgent(strategy=strategy)
+                raw = ai_strategies.get(candidate.name) if ai_strategies else None
+                if isinstance(raw, dict):
+                    prompt = raw.get("prompt")
+                    if prompt:
+                        params = parse_prompt_to_style(prompt, model=ai_model)
+                        agent = StrategyAgent(strategy="custom", style_params=params)
+                    else:
+                        strategy = raw.get("strategy", "balanced")
+                        agent = StrategyAgent(strategy=strategy)
+                elif isinstance(raw, str):
+                    agent = StrategyAgent(strategy=raw)
+                else:
+                    strategy = "balanced"
+                    agent = StrategyAgent(strategy=strategy)
 
             agent.set_candidate(candidate.name)
             self.agents[candidate.name] = agent

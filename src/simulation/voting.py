@@ -9,10 +9,6 @@ DEFAULT_TEMPERATURE = 0.12
 
 
 def calculate_vote_probabilities(voter, parties, temperature: float = DEFAULT_TEMPERATURE) -> Dict[str, float]:
-    """Vote-intention probabilities for one voter across all `parties`.
-
-    Guarantees 0 <= P(candidate) <= 1 and sum(P(candidate)) == 1.
-    """
     scores = {
         f"{party.candidate.name} - {party.name}": calculate_vote_score(voter, party)
         for party in parties

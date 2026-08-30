@@ -92,12 +92,19 @@ def run_poll(world, sample_size=500):
 
 def run_campaign(settings, logger):
     world = World(regions=settings["regions"])
+    ai_strategies = {}
+    prompt = settings.get("campaign_style_prompt")
+    if prompt:
+        for party in world.parties:
+            ai_strategies[party.candidate.name] = {"prompt": prompt}
+
     manager = CampaignManager(
         world=world,
         campaign_weeks=int(settings["campaign_weeks"]),
         starting_budget_per_candidate=500000,
         use_ai=bool(settings.get("use_ai", True)),
         ai_model=str(settings.get("ai_model", "llama2")),
+        ai_strategies=ai_strategies,
     )
     log_message(logger, f"Starting campaign simulation for {len(settings['regions'])} regions and {settings['campaign_weeks']} weeks.")
     report = manager.run_campaign()
@@ -307,6 +314,7 @@ def edit_runtime_settings(settings):
             "5": "Toggle AI",
             "6": "AI model",
             "7": "Log level",
+            "8": "Campaign style prompt",
             "0": "Back",
         })
         choice = input("Select an option: ").strip()
@@ -330,6 +338,9 @@ def edit_runtime_settings(settings):
             settings["ai_model"] = input(f"Set AI model (current: {settings.get('ai_model', 'llama2')}): ").strip() or settings.get("ai_model", "llama2")
         elif choice == "7":
             settings["log_level"] = input(f"Set log level (current: {settings.get('log_level', 'INFO')}): ").strip().upper() or settings.get("log_level", "INFO")
+        elif choice == "8":
+            raw_prompt = input(f"Set campaign style prompt (current present: {'yes' if settings.get('campaign_style_prompt') else 'no'}): ").strip()
+            settings["campaign_style_prompt"] = raw_prompt or None
         else:
             print("  Invalid option.")
 
@@ -373,6 +384,7 @@ def show_runtime_config(settings):
     print(f"- AI enabled: {'yes' if settings.get('use_ai', True) else 'no'}")
     print(f"- AI model: {settings.get('ai_model', 'llama2')}")
     print(f"- Log level: {settings.get('log_level', 'INFO')}")
+    print(f"- Campaign style prompt present: {'yes' if settings.get('campaign_style_prompt') else 'no'}")
     print(f"- Parties: {', '.join(DEFAULT_PARTY_PREFERENCES.keys())}")
     print(f"- Candidates: {', '.join(candidate['name'] for candidate in DEFAULT_CANDIDATES.values())}")
 
