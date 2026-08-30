@@ -14,6 +14,7 @@ from settings import (
     save_settings,
 )
 from simulation.campaignaction import ActionType
+from simulation.parties import CandidateTraits
 
 
 POLICY_KEYS = [
@@ -171,7 +172,7 @@ def edit_region_profiles(settings):
     if not region_names:
         print("No regions configured.")
         return
-
+            traits = base.get("traits", {t: 0.5 for t in CandidateTraits.TRAIT_NAMES})
     while True:
         print_menu("Regional model", {str(i): region for i, region in enumerate(region_names, 1)})
         print("  0. Back")
@@ -338,9 +339,7 @@ def edit_runtime_settings(settings):
         if choice == "0":
             return
         if choice == "1":
-            raw_regions = input(f"Enter regions as a comma-separated list (current: {', '.join(settings['regions'])}): ").strip()
-            if raw_regions:
-                settings["regions"] = [region.strip() for region in raw_regions.split(",") if region.strip()]
+            manage_regions(settings)
         elif choice == "2":
             settings["voters_per_region"] = prompt_int("Set voters per region", settings.get("voters_per_region", 10000))
         elif choice == "3":
@@ -473,6 +472,7 @@ def change_settings(settings):
             "2": "Regional model",
             "3": "Party profiles",
             "4": "Candidate profiles",
+            "6": "Manage candidates",
             "5": "Save and return",
             "0": "Exit without saving",
         })
@@ -487,9 +487,18 @@ def change_settings(settings):
         elif choice == "4":
             edit_candidate_profiles(settings)
         elif choice == "5":
+            # persist any in-memory defaults (regional lean, party prefs, candidates)
+            try:
+                settings["regional_lean"] = DEFAULT_REGIONAL_LEAN
+                settings["party_preferences"] = DEFAULT_PARTY_PREFERENCES
+                settings["candidates"] = DEFAULT_CANDIDATES
+            except Exception:
+                pass
             save_settings(settings)
             print("  Settings saved.")
             return
+        elif choice == "6":
+            manage_candidates(settings)
         elif choice == "0":
             return
         else:
